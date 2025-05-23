@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تاریخچه انرژی متر</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/boxicons.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+                <i class='bx bx-pulse'></i>
+                انرژی متر هوشمند
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="index.html">
+                            <i class='bx bxs-dashboard'></i>
+                            داشبورد
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="history.html">
+                            <i class='bx bx-history'></i>
+                            تاریخچه
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="files.html">
+                            <i class='bx bx-folder'></i>
+                            مدیریت فایل‌ها
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="config.html">
+                            <i class='bx bx-cog'></i>
+                            تنظیمات
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row mb-3">
+            <div class="col-lg-3 col-md-6 mb-2">
+                <label class="form-label">از تاریخ:</label>
+                <input type="datetime-local" id="fromDate" class="form-control bg-dark text-light border-0">
+            </div>
+            <div class="col-lg-3 col-md-6 mb-2">
+                <label class="form-label">تا تاریخ:</label>
+                <input type="datetime-local" id="toDate" class="form-control bg-dark text-light border-0">
+            </div>
+            <div class="col-lg-3 col-md-6 mb-2">
+                <label class="form-label">انتخاب داده:</label>
+                <select id="historyType" class="form-select bg-dark text-light border-0">
+                    <option value="power">توان (W)</option>
+                    <option value="voltage">ولتاژ (V)</option>
+                    <option value="current">جریان (A)</option>
+                    <option value="energy">انرژی (kWh)</option>
+                    <option value="pf">ضریب توان</option>
+                    <option value="frequency">فرکانس (Hz)</option>
+                </select>
+            </div>
+            <div class="col-lg-3 col-md-6 mb-2 d-flex align-items-end">
+                <button class="btn btn-success w-100" id="loadHistory"><i class='bx bx-search'></i> نمایش تاریخچه</button>
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-lg-9 mb-3">
+                <div class="chart-card" style="height: 350px;">
+                    <h6 class="mb-2">نمودار تاریخچه</h6>
+                    <canvas id="historyChart" style="height: 300px;"></canvas>
+                </div>
+            </div>
+            <div class="col-lg-3 mb-3">
+                <div class="stat-card flex-column align-items-start" style="height: 350px;">
+                    <h6 class="mb-3 w-100 text-center">آمار کلی بازه انتخابی</h6>
+                    <div class="w-100 mb-2"><span>میانگین:</span> <span id="avgVal">--</span></div>
+                    <div class="w-100 mb-2"><span>کمینه:</span> <span id="minVal">--</span></div>
+                    <div class="w-100 mb-2"><span>بیشینه:</span> <span id="maxVal">--</span></div>
+                    <div class="w-100 mb-2"><span>مجموع:</span> <span id="sumVal">--</span></div>
+                    <button class="btn btn-outline-info mt-auto w-100" id="downloadCSV"><i class='bx bx-download'></i> دانلود CSV</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card bg-dark text-light">
+                    <div class="card-body p-2">
+                        <h6 class="mb-3">جدول داده‌ها</h6>
+                        <div class="table-responsive">
+                            <table class="table table-dark table-striped table-bordered align-middle" id="historyTable">
+                                <thead>
+                                    <tr>
+                                        <th>تاریخ و ساعت</th>
+                                        <th>مقدار</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- داده‌ها اینجا قرار می‌گیرند -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="js/history.js"></script>
+</body>
+</html> 

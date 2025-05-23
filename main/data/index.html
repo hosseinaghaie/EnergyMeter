@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>داشبورد پاورمتر</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/boxicons.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+    <!-- Chart.js از CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- date-fns adapter از CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <!-- Gauge.js از CDN (درست و تست‌شده) -->
+    <script src="https://cdn.jsdelivr.net/npm/gaugeJS@1.3.7/dist/gauge.min.js"></script>
+</head>
+<body class="dark-theme">
+    <!-- منوی اصلی -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class='bx bx-pulse'></i>
+                انرژی متر هوشمند
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="index.html">
+                            <i class='bx bxs-dashboard'></i>
+                            داشبورد
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="history.html">
+                            <i class='bx bx-history'></i>
+                            تاریخچه
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="files.html">
+                            <i class='bx bx-folder'></i>
+                            مدیریت فایل‌ها
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="config.html">
+                            <i class='bx bx-cog'></i>
+                            تنظیمات
+                        </a>
+                    </li>
+                </ul>
+                <div class="d-flex connection-status-container">
+                    <div class="connection-status">
+                        <span class="status-dot"></span>
+                        <span class="status-text">در حال اتصال...</span>
+                    </div>
+                    <button id="force-refresh-btn" class="btn btn-sm btn-primary ms-2" title="به‌روزرسانی اجباری مقادیر">
+                        <i class='bx bx-refresh'></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- محتوای اصلی -->
+    <div class="container-fluid dashboard-container mt-2">
+        <!-- کارت‌های نمایش اطلاعات -->
+        <div class="info-grid">
+            <div class="info-card">
+                <i class='bx bx-bolt-circle info-icon'></i>
+                <div class="info-value" id="gaugeVoltageValue">0</div>
+                <div class="info-label">ولتاژ (V)</div>
+                <div class="info-trend"><i class='bx bx-trending-neutral'></i></div>
+            </div>
+            <div class="info-card">
+                <i class='bx bx-current-ac info-icon'></i>
+                <div class="info-value" id="gaugeCurrentValue">0</div>
+                <div class="info-label">جریان (A)</div>
+                <div class="info-trend"><i class='bx bx-trending-neutral'></i></div>
+            </div>
+            <div class="info-card">
+                <i class='bx bx-bolt info-icon'></i>
+                <div class="info-value" id="gaugePowerValue">0</div>
+                <div class="info-label">توان (W)</div>
+                <div class="info-trend"><i class='bx bx-trending-neutral'></i></div>
+            </div>
+            <div class="info-card">
+                <i class='bx bx-bar-chart-alt-2 info-icon'></i>
+                <div class="info-value" id="total-energy">0</div>
+                <div class="info-label">انرژی (kWh)</div>
+                <div class="info-trend"><i class='bx bx-trending-neutral'></i></div>
+                <div class="reset-energy-btn" title="ریست شمارنده انرژی">
+                    <i class='bx bx-reset'></i>
+                </div>
+            </div>
+            <div class="info-card">
+                <i class='bx bx-shield-quarter info-icon'></i>
+                <div class="info-value" id="pf">0</div>
+                <div class="info-label">ضریب توان</div>
+                <div class="info-trend"><i class='bx bx-trending-neutral'></i></div>
+            </div>
+            <div class="info-card">
+                <i class='bx bx-pulse info-icon'></i>
+                <div class="info-value" id="frequency">0</div>
+                <div class="info-label">فرکانس (Hz)</div>
+                <div class="info-trend"><i class='bx bx-trending-neutral'></i></div>
+            </div>
+            <div class="info-card">
+                <i class='bx bx-stats info-icon'></i>
+                <div class="info-value" id="apparentPower">0</div>
+                <div class="info-label">توان ظاهری (VA)</div>
+                <div class="info-trend"><i class='bx bx-trending-neutral'></i></div>
+            </div>
+            <div class="info-card">
+                <i class='bx bx-line-chart info-icon'></i>
+                <div class="info-value" id="reactivePower">0</div>
+                <div class="info-label">توان راکتیو (VAR)</div>
+                <div class="info-trend"><i class='bx bx-trending-neutral'></i></div>
+            </div>
+        </div>
+        
+        <!-- کنترل‌های نمودار - ساختار جدید کوچکتر -->
+        <div class="chart-container">
+            <div class="chart-header">
+                <div class="chart-period btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary active btn-sm" data-period="1m">1 دقیقه</button>
+                    <button class="btn btn-outline-primary btn-sm" data-period="5m">5 دقیقه</button>
+                    <button class="btn btn-outline-primary btn-sm" data-period="15m">15 دقیقه</button>
+                    <button class="btn btn-outline-primary btn-sm" data-period="1h">1 ساعت</button>
+                </div>
+                <div class="chart-legend">
+                    <label class="legend-item">
+                        <input type="checkbox" checked data-series="voltage">
+                        <span class="legend-color" style="background-color:#00ffc3"></span>
+                        <span class="legend-text">ولتاژ</span>
+                    </label>
+                    <label class="legend-item">
+                        <input type="checkbox" checked data-series="current">
+                        <span class="legend-color" style="background-color:#2196f3"></span>
+                        <span class="legend-text">جریان</span>
+                    </label>
+                    <label class="legend-item">
+                        <input type="checkbox" checked data-series="power">
+                        <span class="legend-color" style="background-color:#ff9800"></span>
+                        <span class="legend-text">توان</span>
+                    </label>
+                    <label class="legend-item">
+                        <input type="checkbox" checked data-series="pf">
+                        <span class="legend-color" style="background-color:#e91e63"></span>
+                        <span class="legend-text">پاورفکتور</span>
+                    </label>
+                </div>
+            </div>
+            <div class="chart-card">
+                <canvas id="multiAxisChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <style>
+        body.dark-theme { background: var(--background-dark); }
+        
+        /* استایل وضعیت اتصال */
+        .connection-status-container {
+            margin-right: 10px;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid var(--card-dark);
+            background-color: rgba(0,0,0,0.2);
+            padding: 2px 12px;
+        }
+        .connection-status {
+            display: flex;
+            align-items: center;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #e74c3c;
+            margin-left: 6px;
+        }
+        body.connected .status-dot { 
+            background-color: var(--primary-color);
+            box-shadow: 0 0 5px var(--primary-color), 0 0 10px var(--primary-color);
+        }
+        body.connected .status-text { color: var(--primary-color); }
+        
+        /* استایل کنترل‌های نمودار */
+        .chart-container {
+            margin-bottom: 10px;
+        }
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .chart-period {
+            margin-left: 5px;
+        }
+        .chart-period .btn {
+            padding: 0.15rem 0.4rem;
+            font-size: 0.75rem;
+        }
+        .chart-legend {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            margin-left: 5px;
+        }
+        .legend-item input {
+            display: none;
+        }
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            margin-left: 4px;
+            opacity: 0.5;
+        }
+        .legend-item input:checked + .legend-color {
+            opacity: 1;
+        }
+        .legend-text {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+        }
+        .legend-item input:checked ~ .legend-text {
+            color: var(--text-primary);
+        }
+        
+        /* استایل روند تغییرات */
+        .info-trend {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            font-size: 0.9rem;
+        }
+        .info-trend i {
+            color: var(--text-secondary);
+        }
+        .info-trend .bx-trending-up { color: var(--primary-color); }
+        .info-trend .bx-trending-down { color: #e74c3c; }
+        
+        /* سازگاری با موبایل */
+        @media (max-width: 768px) {
+            .chart-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .chart-legend {
+                margin-top: 5px;
+            }
+            .connection-status-container {
+                margin-top: 5px;
+            }
+        }
+
+        /* استایل دکمه ریست انرژی */
+        .reset-energy-btn {
+            position: absolute;
+            bottom: 8px;
+            left: 8px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: color 0.2s;
+            opacity: 0.7;
+        }
+
+        .reset-energy-btn:hover {
+            color: #ff5252;
+            opacity: 1;
+        }
+
+        .reset-energy-btn i {
+            filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
+        }
+    </style>
+    <!-- Main.js -->
+    <script src="js/main.js"></script>
+</body>
+</html> 

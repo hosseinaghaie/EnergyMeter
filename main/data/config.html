@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تنظیمات - انرژی متر هوشمند</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/boxicons.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+                <i class='bx bx-pulse'></i>
+                انرژی متر هوشمند
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="index.html">
+                            <i class='bx bxs-dashboard'></i>
+                            داشبورد
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="history.html">
+                            <i class='bx bx-history'></i>
+                            تاریخچه
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="files.html">
+                            <i class='bx bx-folder'></i>
+                            مدیریت فایل‌ها
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="config.html">
+                            <i class='bx bx-cog'></i>
+                            تنظیمات
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <ul class="nav nav-tabs mb-3" id="configTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="network-tab" data-bs-toggle="tab" data-bs-target="#network" type="button" role="tab">شبکه</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="user-tab" data-bs-toggle="tab" data-bs-target="#user" type="button" role="tab">کاربری</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="sensor-tab" data-bs-toggle="tab" data-bs-target="#sensor" type="button" role="tab">سنسور</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="time-tab" data-bs-toggle="tab" data-bs-target="#time" type="button" role="tab">زمان</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="ota-tab" data-bs-toggle="tab" data-bs-target="#ota" type="button" role="tab">بروزرسانی (OTA)</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="advanced-tab" data-bs-toggle="tab" data-bs-target="#advanced" type="button" role="tab">پیشرفته</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="serial-log-tab" data-bs-toggle="tab" data-bs-target="#serial-log" type="button" role="tab">لاگ سریال</button>
+            </li>
+        </ul>
+        <div class="tab-content" id="configTabsContent">
+            <!-- تنظیمات شبکه -->
+            <div class="tab-pane fade show active" id="network" role="tabpanel">
+                <div class="row mb-3">
+                    <div class="col-lg-6 mb-3">
+                        <div class="card bg-dark text-light">
+                            <div class="card-body">
+                                <h6 class="mb-3">حالت شبکه</h6>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="apEnable" checked>
+                                    <label class="form-check-label" for="apEnable">فعال بودن Access Point (AP)</label>
+                                </div>
+                                <div id="apSettings" dir="ltr" style="text-align:left;">
+                                    <div class="mb-2">
+                                        <label class="form-label">SSID (نام وای‌فای AP)</label>
+                                        <input type="text" class="form-control bg-dark text-light border-0" id="apSSID">
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label">رمز عبور AP</label>
+                                        <input type="password" class="form-control bg-dark text-light border-0" id="apPassword">
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label">IP دستگاه (AP)</label>
+                                        <input type="text" class="form-control bg-dark text-light border-0" id="apIP">
+                                    </div>
+                                </div>
+                                <hr>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="clientEnable" checked>
+                                    <label class="form-check-label" for="clientEnable">فعال بودن Client (اتصال به مودم/روتر)</label>
+                                </div>
+                                <div id="clientSettings" dir="ltr" style="text-align:left;">
+                                    <div class="mb-2">
+                                        <label class="form-label">SSID شبکه مقصد</label>
+                                        <input type="text" class="form-control bg-dark text-light border-0" id="clientSSID">
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label">رمز عبور شبکه مقصد</label>
+                                        <input type="password" class="form-control bg-dark text-light border-0" id="clientPassword">
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label">mDNS Name</label>
+                                        <input type="text" class="form-control bg-dark text-light border-0" id="mdnsName">
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label">حالت IP</label>
+                                        <select class="form-select bg-dark text-light border-0" id="ipMode">
+                                            <option value="dhcp">DHCP (خودکار)</option>
+                                            <option value="static">Static (ثابت)</option>
+                                        </select>
+                                    </div>
+                                    <div id="staticIPSettings" style="display:none;">
+                                        <div class="mb-2">
+                                            <label class="form-label">IP</label>
+                                            <input type="text" class="form-control bg-dark text-light border-0" id="clientIP">
+                                        </div>
+                                        <div class="mb-2">
+                                            <label class="form-label">Gateway</label>
+                                            <input type="text" class="form-control bg-dark text-light border-0" id="clientGateway">
+                                        </div>
+                                        <div class="mb-2">
+                                            <label class="form-label">Subnet</label>
+                                            <input type="text" class="form-control bg-dark text-light border-0" id="clientSubnet">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-3 text-end">
+                                    <button class="btn btn-success" id="saveNetwork"><i class='bx bx-save'></i> ذخیره تنظیمات شبکه</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- سایر تنظیمات در تب‌های دیگر -->
+                </div>
+            </div>
+            <!-- تنظیمات کاربری -->
+            <div class="tab-pane fade" id="user" role="tabpanel">
+                <div class="row mb-3">
+                    <div class="col-lg-6 mb-3">
+                        <div class="card bg-dark text-light">
+                            <div class="card-body">
+                                <h6 class="mb-3">تنظیمات کاربری</h6>
+                                <div class="mb-2">
+                                    <label class="form-label">نام کاربری</label>
+                                    <input type="text" class="form-control bg-dark text-light border-0" id="username">
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">رمز عبور جدید</label>
+                                    <input type="password" class="form-control bg-dark text-light border-0" id="newPassword">
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">تکرار رمز عبور</label>
+                                    <input type="password" class="form-control bg-dark text-light border-0" id="repeatPassword">
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="authEnable" checked>
+                                    <label class="form-check-label" for="authEnable">فعال‌سازی احراز هویت</label>
+                                </div>
+                                <div class="mt-3 text-end">
+                                    <button class="btn btn-success" id="saveUser"><i class='bx bx-save'></i> ذخیره تنظیمات کاربری</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- تنظیمات سنسور -->
+            <div class="tab-pane fade" id="sensor" role="tabpanel">
+                <div class="row mb-3">
+                    <div class="col-lg-6 mb-3">
+                        <div class="card bg-dark text-light">
+                            <div class="card-body">
+                                <h6 class="mb-3">تنظیمات سنسور و نمونه‌برداری</h6>
+                                <div class="mb-2">
+                                    <label class="form-label">Sample Rate (ms)</label>
+                                    <input type="number" class="form-control bg-dark text-light border-0" id="sampleRate">
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">روش به‌روزرسانی مقادیر</label>
+                                    <select class="form-select bg-dark text-light border-0" id="updateMethod">
+                                        <option value="0">مستقیم (بدون میانگین‌گیری)</option>
+                                        <option value="1">میانگین‌گیری</option>
+                                        <option value="2">حفظ مقادیر حداکثر</option>
+                                    </select>
+                                </div>
+                                <div class="mb-2" id="avgSettingsContainer">
+                                    <label class="form-label">تعداد نمونه برای میانگین‌گیری</label>
+                                    <input type="number" class="form-control bg-dark text-light border-0" id="avgSamples">
+                                </div>
+                                <div class="mb-2" id="thresholdContainer" style="display:none;">
+                                    <label class="form-label">آستانه کاهش مقادیر (درصد)</label>
+                                    <input type="number" class="form-control bg-dark text-light border-0" id="thresholdPercent" min="1" max="50" value="20">
+                                    <small class="text-muted">مقادیر فقط زمانی کاهش می‌یابند که بیش از این درصد تغییر کنند</small>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">آستانه هشدار ولتاژ (Min/Max)</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control bg-dark text-light border-0" id="minVoltage" placeholder="حداقل">
+                                        <input type="number" class="form-control bg-dark text-light border-0" id="maxVoltage" placeholder="حداکثر">
+                                    </div>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">آستانه هشدار جریان (Min/Max)</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control bg-dark text-light border-0" id="minCurrent" placeholder="حداقل">
+                                        <input type="number" class="form-control bg-dark text-light border-0" id="maxCurrent" placeholder="حداکثر">
+                                    </div>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">آستانه هشدار توان (Min/Max)</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control bg-dark text-light border-0" id="minPower" placeholder="حداقل">
+                                        <input type="number" class="form-control bg-dark text-light border-0" id="maxPower" placeholder="حداکثر">
+                                    </div>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" id="alertEnable" checked>
+                                    <label class="form-check-label" for="alertEnable">فعال‌سازی هشدارها</label>
+                                </div>
+                                
+                                <h6 class="mt-4 mb-3">تنظیمات کالیبراسیون</h6>
+                                <div class="mb-2">
+                                    <label class="form-label">افست ولتاژ</label>
+                                    <input type="number" step="0.1" class="form-control bg-dark text-light border-0" id="voltageOffset" placeholder="مثلاً 1.5">
+                                    <small class="text-muted">مقدار مثبت یا منفی که به مقدار خوانده شده اضافه می‌شود</small>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">افست جریان</label>
+                                    <input type="number" step="0.01" class="form-control bg-dark text-light border-0" id="currentOffset" placeholder="مثلاً 0.05">
+                                    <small class="text-muted">مقدار مثبت یا منفی که به مقدار خوانده شده اضافه می‌شود</small>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">افست توان</label>
+                                    <input type="number" step="1" class="form-control bg-dark text-light border-0" id="powerOffset" placeholder="مثلاً 10">
+                                    <small class="text-muted">مقدار مثبت یا منفی که به مقدار خوانده شده اضافه می‌شود</small>
+                                </div>
+                                
+                                <div class="mt-3 text-end">
+                                    <button class="btn btn-success" id="saveSensor"><i class='bx bx-save'></i> ذخیره تنظیمات سنسور</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- تنظیمات زمان -->
+            <div class="tab-pane fade" id="time" role="tabpanel">
+                <div class="row mb-3">
+                    <div class="col-lg-6 mb-3">
+                        <div class="card bg-dark text-light">
+                            <div class="card-body">
+                                <h6 class="mb-3">تنظیمات زمان و NTP</h6>
+                                <div class="mb-2">
+                                    <label class="form-label">آفست زمانی نسبت به GMT (دقیقه)</label>
+                                    <div class="input-group">
+                                        <select class="form-select bg-dark text-light border-0" id="gmtSign">
+                                            <option value="+">+</option>
+                                            <option value="-">-</option>
+                                        </select>
+                                        <input type="number" class="form-control bg-dark text-light border-0" id="gmtOffset" placeholder="مثلاً 210 برای ایران">
+                                        <span class="input-group-text">دقیقه</span>
+                                    </div>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">آدرس سرور NTP</label>
+                                    <input type="text" class="form-control bg-dark text-light border-0" id="ntpServer" value="pool.ntp.org">
+                                </div>
+                                <div class="mb-2 d-flex align-items-center gap-2">
+                                    <button class="btn btn-info" id="syncTime"><i class='bx bx-sync'></i> سینک ساعت با NTP</button>
+                                    <span id="syncStatus" class="text-success small">--</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- تنظیمات OTA -->
+            <div class="tab-pane fade" id="ota" role="tabpanel">
+                <div class="row mb-3">
+                    <div class="col-lg-6 mb-3">
+                        <div class="card bg-dark text-light">
+                            <div class="card-body">
+                                <h6 class="mb-3">بروزرسانی LittleFS (صفحات وب)</h6>
+                                <input type="file" id="littlefsFile" class="form-control mb-2">
+                                <button class="btn btn-success w-100 mb-2" id="uploadLittleFS"><i class='bx bx-upload'></i> آپلود LittleFS</button>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-info" id="littlefsProgress" style="width: 0%;"></div>
+                                </div>
+                                <div id="littlefsStatus" class="mt-2 text-info small"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6 mb-3">
+                        <div class="card bg-dark text-light">
+                            <div class="card-body">
+                                <h6 class="mb-3">بروزرسانی Firmware</h6>
+                                <input type="file" id="firmwareFile" class="form-control mb-2">
+                                <button class="btn btn-warning w-100 mb-2" id="uploadFirmware"><i class='bx bx-upload'></i> آپلود Firmware</button>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-warning" id="firmwareProgress" style="width: 0%;"></div>
+                                </div>
+                                <div id="firmwareStatus" class="mt-2 text-warning small"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- تنظیمات پیشرفته -->
+            <div class="tab-pane fade" id="advanced" role="tabpanel">
+                <div class="row mb-3">
+                    <div class="col-lg-6 mb-3">
+                        <div class="card bg-dark text-light">
+                            <div class="card-body">
+                                <h6 class="mb-3">تنظیمات کالیبراسیون</h6>
+                                <div class="mb-2">
+                                    <label class="form-label">افست ولتاژ (V)</label>
+                                    <input type="number" class="form-control bg-dark text-light border-0" id="voltageOffset" step="0.1" value="0">
+                                    <small class="text-muted">مقدار مثبت یا منفی برای تصحیح ولتاژ</small>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">افست جریان (A)</label>
+                                    <input type="number" class="form-control bg-dark text-light border-0" id="currentOffset" step="0.01" value="0">
+                                    <small class="text-muted">مقدار مثبت یا منفی برای تصحیح جریان</small>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">افست توان (W)</label>
+                                    <input type="number" class="form-control bg-dark text-light border-0" id="powerOffset" step="1" value="0">
+                                    <small class="text-muted">مقدار مثبت یا منفی برای تصحیح توان</small>
+                                </div>
+                                <hr>
+                                <h6 class="mb-3">روش پردازش مقادیر</h6>
+                                <div class="mb-2">
+                                    <label class="form-label">روش به‌روزرسانی مقادیر</label>
+                                    <select class="form-select bg-dark text-light border-0" id="updateMethod">
+                                        <option value="0">مستقیم (بدون میانگین‌گیری)</option>
+                                        <option value="1">میانگین‌گیری</option>
+                                        <option value="2">حفظ مقادیر حداکثر</option>
+                                    </select>
+                                    <small class="text-muted">انتخاب نحوه نمایش و پردازش مقادیر اندازه‌گیری شده</small>
+                                </div>
+                                <div class="mb-2" id="thresholdContainer">
+                                    <label class="form-label">آستانه کاهش مقادیر (درصد)</label>
+                                    <input type="number" class="form-control bg-dark text-light border-0" id="thresholdPercent" min="1" max="50" value="20">
+                                    <small class="text-muted">مقادیر فقط زمانی کاهش می‌یابند که بیش از این درصد تغییر کنند</small>
+                                </div>
+                                <div class="alert alert-info">
+                                    <strong>راهنما:</strong> 
+                                    <ul>
+                                        <li><strong>مستقیم:</strong> نمایش مقادیر واقعی بدون هیچ پردازشی</li>
+                                        <li><strong>میانگین‌گیری:</strong> نمایش میانگین چند نمونه اخیر</li>
+                                        <li><strong>حفظ حداکثر:</strong> مقادیر فقط با کاهش قابل توجه کم می‌شوند</li>
+                                    </ul>
+                                </div>
+                                <div class="mt-3 text-end">
+                                    <button class="btn btn-success" id="saveAdvanced"><i class='bx bx-save'></i> ذخیره تنظیمات پیشرفته</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- تب لاگ سریال -->
+            <div class="tab-pane fade" id="serial-log" role="tabpanel">
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <div class="card bg-dark text-light">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">
+                                        <i class='bx bx-terminal'></i>
+                                        لاگ سریال (مقادیر خام سنسور)
+                                    </h5>
+                                    <div>
+                                        <button id="toggle-serial-log-btn" class="btn btn-sm btn-secondary">
+                                            <i class='bx bx-code-alt'></i>
+                                            <span class="serial-log-status">فعال کردن لاگ سریال</span>
+                                        </button>
+                                        <button id="clear-log-btn" class="btn btn-sm btn-danger ms-2">
+                                            <i class='bx bx-trash'></i>
+                                            پاک کردن لاگ
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="serial-log-controls mb-3">
+                                    <div class="row align-items-center">
+                                        <div class="col-md-3">
+                                            <label class="form-label">فاصله زمانی لاگ:</label>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <input type="range" class="form-range" id="log-interval-range" min="100" max="5000" step="100" value="1000">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <span id="log-interval-value" class="badge bg-primary">1000 میلی‌ثانیه</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="serial-log-container">
+                                    <pre id="serial-log-content" class="p-3 rounded" style="height: 400px; overflow-y: auto; background-color: #121212; color: #00ff00; font-family: monospace; font-size: 0.9rem; white-space: pre-wrap;"></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/serial-log.js"></script>
+    <script>
+        // نمایش/مخفی کردن تنظیمات Static IP
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('ipMode').addEventListener('change', function() {
+                document.getElementById('staticIPSettings').style.display = this.value === 'static' ? '' : 'none';
+            });
+            
+            // فعال کردن تب لاگ سریال اگر هش URL برابر با #serial-log باشد
+            if (window.location.hash === '#serial-log') {
+                document.getElementById('serial-log-tab').click();
+            }
+            
+            // نمایش/مخفی کردن تنظیمات میانگین‌گیری
+            const updateMethodSelect = document.getElementById('updateMethod');
+            if (updateMethodSelect) {
+                updateMethodSelect.addEventListener('change', function() {
+                    document.getElementById('avgSettingsContainer').style.display = 
+                        this.value === '1' ? 'block' : 'none';
+                });
+                
+                // اجرای اولیه برای تنظیم حالت فعلی
+                document.getElementById('avgSettingsContainer').style.display = 
+                    updateMethodSelect.value === '1' ? 'block' : 'none';
+            }
+        });
+    </script>
+</body>
+</html> 

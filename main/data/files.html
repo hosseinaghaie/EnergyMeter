@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مدیریت فایل‌ها - انرژی متر هوشمند</title>
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/boxicons.min.css" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet">
+    <style>
+        .explorer-toolbar button { margin-left: 8px; }
+        .explorer-table th, .explorer-table td { vertical-align: middle; }
+        .explorer-table td.icon { width: 36px; text-align: center; }
+        .explorer-table td.actions { width: 140px; text-align: center; }
+        .explorer-breadcrumb { background: #23272b; color: #fff; border-radius: 6px; padding: 6px 12px; margin-bottom: 10px; }
+    </style>
+</head>
+<body class="dark-theme">
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">
+                <i class='bx bx-pulse'></i>
+                انرژی متر هوشمند
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="index.html">
+                            <i class='bx bxs-dashboard'></i>
+                            داشبورد
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="history.html">
+                            <i class='bx bx-history'></i>
+                            تاریخچه
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="files.html">
+                            <i class='bx bx-folder'></i>
+                            مدیریت فایل‌ها
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="config.html">
+                            <i class='bx bx-cog'></i>
+                            تنظیمات
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <!-- نوار ابزار فایل منیجر -->
+        <div class="explorer-toolbar d-flex flex-wrap align-items-center mb-3 gap-2">
+            <button class="btn btn-success" id="uploadBtn"><i class='bx bx-upload'></i> آپلود</button>
+            <input type="file" id="uploadInput" class="d-none" multiple>
+            <button class="btn btn-primary" id="downloadBtn"><i class='bx bx-download'></i> دانلود</button>
+            <button class="btn btn-danger" id="deleteBtn"><i class='bx bx-trash'></i> حذف</button>
+            <button class="btn btn-secondary" id="newFolderBtn"><i class='bx bx-folder-plus'></i> پوشه جدید</button>
+            <button class="btn btn-info" id="refreshBtn"><i class='bx bx-refresh'></i> رفرش</button>
+            <div class="flex-grow-1"></div>
+        </div>
+        <!-- مسیر جاری -->
+        <div class="explorer-breadcrumb" id="breadcrumb" style="font-size:1.1rem; font-weight:bold;">
+            <i class='bx bx-folder'></i> <span id="breadcrumb-path">/</span>
+        </div>
+        <!-- جدول فایل‌ها و فولدرها -->
+        <div class="card bg-dark text-light">
+            <div class="card-body p-2">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle explorer-table" id="filesTable">
+                        <thead>
+                            <tr>
+                                <th class="icon"></th>
+                                <th>نام</th>
+                                <th>حجم</th>
+                                <th>تاریخ</th>
+                                <th class="actions">عملیات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- فایل‌ها و فولدرها اینجا قرار می‌گیرند -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="uploadStatus" class="mt-2 text-info small"></div>
+                <div class="progress mt-2" style="height: 8px; display:none;">
+                    <div class="progress-bar bg-info" id="uploadProgress" style="width: 0%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/bootstrap.bundle.min.js"></script>
+    <script src="js/files.js"></script>
+</body>
+</html> 

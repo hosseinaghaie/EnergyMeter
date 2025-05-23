@@ -1,0 +1,17 @@
+# Partition table for ESP32
+# Name,     Type, SubType, Offset,   Size,       Flags
+nvs,        data, nvs,     0x9000,   0x5000,     
+otadata,    data, ota,     0xe000,   0x2000,     
+app0,       app,  ota_0,   0x10000,  0x480000,   
+app1,       app,  ota_1,   0x490000, 0x480000,   
+spiffs,     data, spiffs,  0x910000, 0x6E0000,   
+coredump,   data, coredump,0xFF0000, 0x10000,    
+
+#
+# Descriptions:
+# - NVS: Non-volatile storage for configuration (20 KB).
+# - OTA Data: Manages active OTA partition (8 KB).
+# - app0/app1: OTA partitions (4.5 MB each).
+# - SPIFFS: Filesystem partition for LittleFS (6.94 MB).
+# - Core Dump: Stores crash logs for debugging (64 KB).
+#
