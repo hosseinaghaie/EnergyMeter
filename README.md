@@ -26,4 +26,11 @@ Network settings (AP/Client modes, IP settings)
 User authentication
 Sensor parameters (sample rate, thresholds)
 Time settings
-Screenshots
+
+This project provides an affordable and customizable solution for monitoring power consumption in your home or office.
+
+Screenshots:
+https://github.com/hosseinaghaie/EnergyMeter/blob/main/Doc/screenshot/mob1%20(1).jpg
+https://github.com/hosseinaghaie/EnergyMeter/blob/main/Doc/screenshot/mob1%20(2).jpg
+https://github.com/hosseinaghaie/EnergyMeter/blob/main/Doc/screenshot/mob1%20(3).jpg
+https://github.com/hosseinaghaie/EnergyMeter/blob/main/Doc/screenshot/mob1%20(4).jpg
