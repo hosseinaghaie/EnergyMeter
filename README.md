@@ -30,7 +30,10 @@ Time settings
 This project provides an affordable and customizable solution for monitoring power consumption in your home or office.
 
 Screenshots:
-![Test Image 4] https://github.com/hosseinaghaie/EnergyMeter/blob/main/Doc/screenshot/mob1%20(1).jpg
-https://github.com/hosseinaghaie/EnergyMeter/blob/main/Doc/screenshot/mob1%20(2).jpg
-https://github.com/hosseinaghaie/EnergyMeter/blob/main/Doc/screenshot/mob1%20(3).jpg
-https://github.com/hosseinaghaie/EnergyMeter/blob/main/Doc/screenshot/mob1%20(4).jpg
+![mob1 (1)](https://github.com/user-attachments/assets/08725c1b-8876-4d66-918c-63dd39258cae)
+![mob1 (2)](https://github.com/user-attachments/assets/b6df1e93-8a0d-418d-bd99-d8c24f12ffd0)
+![mob1 (3)](https://github.com/user-attachments/assets/de4d3157-9758-4d6f-a0f3-ecbe5ae8617e)
+![mob1 (4)](https://github.com/user-attachments/assets/fd0c3390-63f7-417a-b52c-57816781a8ca)
+
+
+
