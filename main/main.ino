@@ -2,15 +2,66 @@
 ///////////////////////////
 WiFiUDP ntpUDP;
 
+/**
+ * RGB LED Control Functions
+ * -------------------------
+ * The RGB LED is used to indicate the device's status:
+ * - WHITE: Boot/initialization
+ * - RED: Error state
+ * - YELLOW: AP active without connections or connecting to WiFi
+ * - BLUE: Devices connected to AP
+ * - GREEN: Successfully connected to WiFi
+ * - PURPLE: Firmware update or file upload in progress
+ */
+
+// توابع مدیریت LED RGB
+void setupLED() {
+  // راه‌اندازی LED RGB
+  rgbLed.begin();
+  rgbLed.clear(); // خاموش کردن همه پیکسل‌ها
+  rgbLed.setBrightness(50); // تنظیم روشنایی LED (0-255)
+  setLEDColor(LED_COLOR_WHITE); // LED سفید به معنای شروع بوت
+  rgbLed.show();
+  delay(500);
+}
+
+// تنظیم رنگ LED
+void setLEDColor(uint8_t r, uint8_t g, uint8_t b) {
+  rgbLed.setPixelColor(0, rgbLed.Color(r, g, b));
+  rgbLed.show();
+}
+
+// نمایش وضعیت شبکه با LED
+void updateNetworkLEDStatus() {
+  if (WiFi.status() == WL_CONNECTED) {
+    // اتصال موفق به WiFi
+    setLEDColor(LED_COLOR_GREEN);
+  } else if (deviceConfig.network.apEnable && WiFi.softAPgetStationNum() > 0) {
+    // حداقل یک دستگاه به AP متصل شده
+    setLEDColor(LED_COLOR_BLUE);
+  } else if (deviceConfig.network.apEnable) {
+    // AP فعال است اما هیچ دستگاهی متصل نیست
+    setLEDColor(LED_COLOR_YELLOW);
+  } else {
+    // هیچ اتصالی برقرار نیست
+    setLEDColor(LED_COLOR_RED);
+  }
+}
+
 // Main setup function: initializes all modules and services
 void setup() {
   // Initialize serial communication
   Serial.begin(115200);
   Serial.println("Starting Power Meter...");
 
+  // راه‌اندازی LED RGB
+  setupLED();
+  Serial.println("RGB LED initialized");
+
   // Initialize LittleFS file system
   if (!LittleFS.begin(true)) {
     Serial.println("Error mounting LittleFS");
+    setLEDColor(LED_COLOR_RED); // نشان دادن خطا با LED قرمز
     return;
   }
   Serial.println("LittleFS mounted OK");
@@ -29,9 +80,13 @@ void setup() {
   // Initialize network (WiFi, mDNS, NTP)
   if (!setupNetwork(deviceConfig)) {
     Serial.println("Network setup failed! Skipping sensor and web server setup.");
+    setLEDColor(LED_COLOR_RED); // نشان دادن خطا با LED قرمز
     return;
   }
   Serial.println("Network setup done");
+  
+  // بروزرسانی وضعیت LED بر اساس وضعیت شبکه
+  updateNetworkLEDStatus();
 
   // Initialize PZEM sensor
   setupSensor();
@@ -89,6 +144,13 @@ void loop() {
       Serial.println("Skipping NTP sync - WiFi not connected");
     }
     lastNTPUpdate = millis();
+  }
+  
+  // بررسی وضعیت شبکه هر 10 ثانیه و بروزرسانی LED
+  static unsigned long lastLEDUpdate = 0;
+  if (millis() - lastLEDUpdate >= 10000) {
+    updateNetworkLEDStatus();
+    lastLEDUpdate = millis();
   }
 }
 

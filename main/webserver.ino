@@ -1,6 +1,24 @@
 #include <FS.h>
 #include <LittleFS.h>
 
+/**
+ * RGB LED Usage in Web Server
+ * ---------------------------
+ * During firmware updates and file uploads, the LED is temporarily set to PURPLE.
+ * The previous LED color is stored in 'previousLEDColor' and restored when the
+ * operation completes or fails.
+ * 
+ * - Normal operations: LED shows network status (GREEN, BLUE, YELLOW, or RED)
+ * - File upload: LED turns PURPLE during upload, then returns to previous state
+ * - Firmware update: LED turns PURPLE during update, then restarts device
+ */
+
+// متغیر جهانی برای ذخیره وضعیت LED قبل از بروزرسانی
+uint32_t previousLEDColor = 0;
+
+// متغیر استاتیک برای آپلود فایل
+static File uploadFile;
+
 // Broadcasts the latest sample data to all connected WebSocket clients
 void broadcastData(const Sample &sample) {
     if (ws.count() == 0) return;
@@ -122,6 +140,9 @@ void setupWebServer() {
         if (jsonToConfig(body, deviceConfig)) {
             saveConfig(deviceConfig);
             request->send(200, "application/json", "{\"ok\":true}");
+            
+            // بروزرسانی وضعیت LED بر اساس وضعیت شبکه جدید
+            updateNetworkLEDStatus();
         } else {
             request->send(400, "application/json", "{\"ok\":false,\"error\":\"Invalid JSON\"}");
         }
@@ -400,24 +421,84 @@ void setupWebServer() {
         request->send(200, "application/json", ok ? "{\"ok\":true}" : "{\"ok\":false}" );
     });
 
+    // مدیریت بروزرسانی فریم‌ور
+    server.on("/update", HTTP_POST, [](AsyncWebServerRequest *request) {
+        // وقتی بروزرسانی تمام شد، وضعیت LED را به حالت قبلی برگردان
+        rgbLed.setPixelColor(0, previousLEDColor);
+        rgbLed.show();
+        
+        boolean shouldReboot = !Update.hasError();
+        AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", shouldReboot ? "OK" : "FAIL");
+        response->addHeader("Connection", "close");
+        request->send(response);
+        
+        if (shouldReboot) {
+            delay(500);
+            ESP.restart();
+        }
+    }, [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+        if (index == 0) {
+            // ذخیره رنگ فعلی LED قبل از بروزرسانی
+            previousLEDColor = rgbLed.getPixelColor(0);
+            
+            // تنظیم LED به رنگ بنفش (بروزرسانی)
+            setLEDColor(LED_COLOR_PURPLE);
+            
+            Serial.printf("Update start: %s\n", filename.c_str());
+            if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+                Update.printError(Serial);
+            }
+        }
+        
+        if (Update.write(data, len) != len) {
+            Update.printError(Serial);
+        }
+        
+        if (final) {
+            if (Update.end(true)) {
+                Serial.printf("Update success: %u bytes\n", index + len);
+            } else {
+                Update.printError(Serial);
+                
+                // برگرداندن LED به حالت قبلی در صورت خطا
+                rgbLed.setPixelColor(0, previousLEDColor);
+                rgbLed.show();
+            }
+        }
+    });
+
     // آپلود فایل
     server.on("/upload", HTTP_POST, [](AsyncWebServerRequest *request){
         request->send(200, "application/json", "{\"ok\":true}");
+        
+        // برگرداندن LED به حالت قبلی بعد از آپلود
+        rgbLed.setPixelColor(0, previousLEDColor);
+        rgbLed.show();
     },
     [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final){
-        String path = "/" + filename;
-        if (request->hasParam("path", true)) {
-            String dir = request->getParam("path", true)->value();
-            if (!dir.endsWith("/")) dir += "/";
-            path = dir + filename;
-        }
-        static File uploadFile;
         if (index == 0) {
+            // ذخیره رنگ فعلی LED قبل از آپلود
+            previousLEDColor = rgbLed.getPixelColor(0);
+            
+            // تنظیم LED به رنگ بنفش (آپلود)
+            setLEDColor(LED_COLOR_PURPLE);
+            
+            String path = "/" + filename;
+            if (request->hasParam("path", true)) {
+                String dir = request->getParam("path", true)->value();
+                if (!dir.endsWith("/")) dir += "/";
+                path = dir + filename;
+            }
             if (LittleFS.exists(path)) LittleFS.remove(path);
             uploadFile = LittleFS.open(path, "w");
         }
+        
         if (uploadFile) uploadFile.write(data, len);
-        if (final && uploadFile) uploadFile.close();
+        
+        if (final && uploadFile) {
+            uploadFile.close();
+            Serial.printf("Upload complete: %s, size: %u bytes\n", filename.c_str(), index + len);
+        }
     });
     // Start the web server
     server.begin();

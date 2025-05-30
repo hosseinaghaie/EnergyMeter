@@ -172,7 +172,7 @@ Sample calculateAverage() {
     return avg;
 }
 
-// Reads a new sample, validates it, checks for sudden changes, and updates the sample array
+// تابع پردازش نمونه جدید
 Sample processNewSample() {
     Sample newSample = readPZEM();
     

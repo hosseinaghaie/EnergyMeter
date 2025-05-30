@@ -6,6 +6,23 @@
 #include "settings.h"
 #include <time.h>
 
+/**
+ * Network-related LED Status Indicators
+ * -------------------------------------
+ * The RGB LED reflects the current network status:
+ * 
+ * - GREEN: Successfully connected to WiFi
+ * - BLUE: At least one device connected to AP mode (but not to WiFi)
+ * - YELLOW: AP mode active without connections, or connecting to WiFi
+ * - RED: No connections (neither WiFi nor AP with clients)
+ * 
+ * LED status is updated on network events through these handlers:
+ * - onWiFiGotIP: When device gets an IP address (GREEN)
+ * - onWiFiDisconnected: When WiFi disconnects (YELLOW or RED)
+ * - onWiFiAPStationConnected: When a device connects to AP (BLUE)
+ * - onWiFiAPStationDisconnected: When a device disconnects from AP
+ */
+
 // --- Event Handlers ---
 void onWiFiGotIP(WiFiEvent_t event, WiFiEventInfo_t info) {
     Serial.println("✅ [EVENT] WiFi Got IP!");
@@ -15,17 +32,50 @@ void onWiFiGotIP(WiFiEvent_t event, WiFiEventInfo_t info) {
     Serial.println(WiFi.SSID());
     Serial.print("RSSI: ");
     Serial.println(WiFi.RSSI());
+    
+    // نمایش وضعیت اتصال با LED سبز
+    setLEDColor(LED_COLOR_GREEN);
 }
 
 void onWiFiDisconnected(WiFiEvent_t event, WiFiEventInfo_t info) {
     Serial.println("❌ [EVENT] WiFi Disconnected.");
     Serial.print("Reason: ");
     Serial.println(info.wifi_sta_disconnected.reason);
+    
+    // بروزرسانی وضعیت LED بر اساس وضعیت AP
+    if (deviceConfig.network.apEnable && WiFi.softAPgetStationNum() > 0) {
+        // حداقل یک دستگاه به AP متصل شده
+        setLEDColor(LED_COLOR_BLUE);
+    } else if (deviceConfig.network.apEnable) {
+        // AP فعال است اما هیچ دستگاهی متصل نیست
+        setLEDColor(LED_COLOR_YELLOW);
+    } else {
+        // هیچ اتصالی برقرار نیست
+        setLEDColor(LED_COLOR_RED);
+    }
+}
+
+void onWiFiAPStationConnected(WiFiEvent_t event, WiFiEventInfo_t info) {
+    Serial.println("✅ [EVENT] Station connected to AP");
+    
+    // اگر به شبکه WiFi متصل نیستیم، LED را آبی کنیم
+    if (WiFi.status() != WL_CONNECTED) {
+        setLEDColor(LED_COLOR_BLUE);
+    }
+}
+
+void onWiFiAPStationDisconnected(WiFiEvent_t event, WiFiEventInfo_t info) {
+    Serial.println("❌ [EVENT] Station disconnected from AP");
+    
+    // بروزرسانی وضعیت LED
+    updateNetworkLEDStatus();
 }
 
 void wifi_event_handler_init() {
     WiFi.onEvent(onWiFiGotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP);
     WiFi.onEvent(onWiFiDisconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+    WiFi.onEvent(onWiFiAPStationConnected, ARDUINO_EVENT_WIFI_AP_STACONNECTED);
+    WiFi.onEvent(onWiFiAPStationDisconnected, ARDUINO_EVENT_WIFI_AP_STADISCONNECTED);
 }
 
 // --- WiFi Setup (Dual Mode: AP + STA) ---
@@ -40,6 +90,10 @@ void setupNetworkDual(const NetworkConfig &net) {
     Serial.print(apSSID);
     Serial.print(", IP: ");
     Serial.println(WiFi.softAPIP());
+    
+    // LED را زرد کنیم (در حال اتصال)
+    setLEDColor(LED_COLOR_YELLOW);
+    
     // اگر کلاینت فعال بود
     if (net.clientEnable) {
         if (net.ipMode == "static" && net.clientIP.length() > 0) {
@@ -103,8 +157,12 @@ bool setupNetwork(const DeviceConfig &config) {
     // NTP و ست کردن RTC داخلی
     if (WiFi.status() == WL_CONNECTED) {
         syncTimeWithNTP();
+        // اتصال موفق - LED سبز
+        setLEDColor(LED_COLOR_GREEN);
     } else {
         Serial.println("NTP not started: WiFi not connected.");
+        // بروزرسانی وضعیت LED براساس وضعیت شبکه
+        updateNetworkLEDStatus();
     }
     return true;
 }

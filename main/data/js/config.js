@@ -22,6 +22,8 @@ document.addEventListener('DOMContentLoaded', function() {
             // سنسور
             document.getElementById('sampleRate').value = cfg.sensor.sampleRate;
             document.getElementById('avgSamples').value = cfg.sensor.avgSamples;
+            
+            // هشدارها - انتقال داده‌های آستانه به تب هشدارها
             document.getElementById('minVoltage').value = cfg.sensor.minVoltage;
             document.getElementById('maxVoltage').value = cfg.sensor.maxVoltage;
             document.getElementById('minCurrent').value = cfg.sensor.minCurrent;
@@ -30,11 +32,11 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('maxPower').value = cfg.sensor.maxPower;
             document.getElementById('alertEnable').checked = cfg.sensor.alertEnable;
             
-            // تنظیمات پیشرفته
+            // تنظیمات پیشرفته (حالا در بخش سنسور)
             fetch('/api/advanced-settings')
                 .then(res => res.json())
                 .then(advSettings => {
-                    // پر کردن فیلدهای تنظیمات پیشرفته
+                    // پر کردن فیلدهای تنظیمات کالیبراسیون و پردازش در بخش سنسور
                     if (document.getElementById('updateMethod')) {
                         // مپ کردن مقادیر عددی به مقادیر متنی برای select
                         let updateMethodValue = "0"; // مستقیم - پیش‌فرض
@@ -58,13 +60,20 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('ntpServer').value = cfg.time.ntpServer;
         });
 
-    // رویداد تغییر روش به‌روزرسانی
+    // رویداد تغییر روش به‌روزرسانی در تب سنسور
     document.getElementById('updateMethod')?.addEventListener('change', function() {
+        const avgSettingsContainer = document.getElementById('avgSettingsContainer');
         const thresholdContainer = document.getElementById('thresholdContainer');
-        if (this.value === "2") { // حفظ حداکثر
+        
+        // مخفی کردن هر دو کانتینر ابتدا
+        avgSettingsContainer.style.display = 'none';
+        thresholdContainer.style.display = 'none';
+        
+        // نمایش کانتینر مناسب بر اساس انتخاب
+        if (this.value === "1") { // میانگین‌گیری
+            avgSettingsContainer.style.display = 'block';
+        } else if (this.value === "2") { // حفظ حداکثر
             thresholdContainer.style.display = 'block';
-        } else {
-            thresholdContainer.style.display = 'none';
         }
     });
 
@@ -77,13 +86,12 @@ document.addEventListener('DOMContentLoaded', function() {
         sendConfig();
     });
     
-    // ذخیره تنظیمات سنسور
+    // ذخیره تنظیمات سنسور (شامل کالیبراسیون و پردازش)
     document.getElementById('saveSensor')?.addEventListener('click', function() {
+        // ذخیره تنظیمات عمومی
         sendConfig();
-    });
-    
-    // ذخیره تنظیمات پیشرفته
-    document.getElementById('saveAdvanced')?.addEventListener('click', function() {
+        
+        // ذخیره تنظیمات پیشرفته مربوط به سنسور
         const methodValue = parseInt(document.getElementById('updateMethod').value);
         
         // ذخیره روش به‌روزرسانی
@@ -130,12 +138,17 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(res => res.json())
         .then(data => {
-            alert('تنظیمات پیشرفته با موفقیت ذخیره شد!');
+            alert('تنظیمات سنسور با موفقیت ذخیره شد!');
         })
         .catch(err => {
             console.error(err);
-            alert('خطا در ذخیره تنظیمات پیشرفته!');
+            alert('خطا در ذخیره تنظیمات سنسور!');
         });
+    });
+    
+    // ذخیره تنظیمات هشدارها
+    document.getElementById('saveAlarm')?.addEventListener('click', function() {
+        sendConfig();
     });
 
     function sendConfig() {
