@@ -130,6 +130,10 @@ struct AdvancedConfig {
     bool serialLoggingEnabled = false; // فعال/غیرفعال کردن لاگ سریال مقادیر سنسور
     int serialLogInterval = 1000;      // فاصله زمانی بین لاگ‌های سریال (میلی‌ثانیه)
     
+    // تنظیمات لاگ کردن تاریخی
+    bool historyLoggingEnabled = false; // فعال/غیرفعال کردن لاگ تاریخی (کنترل دستی)
+    bool historyLoggingActive = false;  // وضعیت فعلی لاگ کردن (روشن/خاموش)
+    
     // روش به‌روزرسانی مقادیر
     enum UpdateMethod {
         DIRECT = 0,       // مستقیم: همیشه مقدار فعلی را نمایش می‌دهد

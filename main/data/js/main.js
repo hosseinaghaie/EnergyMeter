@@ -6,6 +6,10 @@ let chartType = 'power';
 let multiAxisChart;
 let chartPeriod = '1m'; // دوره زمانی پیش‌فرض
 let lastValues = {}; // برای ذخیره آخرین مقادیر دریافتی
+let esp32Time = null; // زمان ESP32
+let esp32TimeSource = 'Internal RTC'; // منبع زمان ESP32
+let timeSyncStatus = 'SYNCING'; // وضعیت time sync
+
 // مقادیر دینامیک مقیاس
 let minMaxValues = {
     voltage: { min: 180, max: 250 },
@@ -105,12 +109,21 @@ function connectWebSocket() {
     ws.onmessage = function(event) {
         try {
             const data = JSON.parse(event.data);
+            // console.log('WebSocket data received:', data); // کامنت شده برای کاهش حجم console
+            
+            // Check if data is valid
+            if (!data || typeof data !== 'object') {
+                console.error('Invalid data received:', data);
+                return;
+            }
+            
             updateDashboard(data);
             updateAllCharts(data);
             updateTrends(data);
             updateScaleRanges(data);
         } catch (e) {
             console.error('Error parsing WebSocket message:', e);
+            console.error('Raw message:', event.data);
         }
     };
 
@@ -240,43 +253,64 @@ function updateScaleRanges(data) {
 
 // تابع به‌روزرسانی داشبورد
 function updateDashboard(data) {
-    // به‌روزرسانی مقادیر گیج‌ها و نمایشگرها
-    if (data.voltage !== undefined) document.getElementById('gaugeVoltageValue').textContent = data.voltage.toFixed(0);
+    // ذخیره زمان ESP32 و منبع زمان
+    if (data.timestamp !== undefined) {
+        esp32Time = data.timestamp;
+    }
+    if (data.timeSource !== undefined) {
+        esp32TimeSource = data.timeSource;
+    }
+    
+    // به‌روزرسانی مقادیر گیج‌ها و نمایشگرها با null checks
+    if (data.voltage !== undefined && data.voltage !== null) {
+        const voltageEl = document.getElementById('gaugeVoltageValue');
+        if (voltageEl) voltageEl.textContent = data.voltage.toFixed(0);
+    }
     
     // برای جریان، همیشه مقدار واقعی را نشان دهیم
-    if (data.current !== undefined) {
+    if (data.current !== undefined && data.current !== null) {
         const currentEl = document.getElementById('gaugeCurrentValue');
-        currentEl.textContent = data.current.toFixed(2);
-        currentEl.classList.remove('zero-load'); // حذف کلاس رنگ قرمز
+        if (currentEl) {
+            currentEl.textContent = data.current.toFixed(2);
+            currentEl.classList.remove('zero-load'); // حذف کلاس رنگ قرمز
+        }
     }
     
     // برای توان، همیشه مقدار واقعی را نشان دهیم
-    if (data.power !== undefined) {
+    if (data.power !== undefined && data.power !== null) {
         const powerEl = document.getElementById('gaugePowerValue');
-        powerEl.textContent = data.power.toFixed(0);
-        powerEl.classList.remove('zero-load'); // حذف کلاس رنگ قرمز
+        if (powerEl) {
+            powerEl.textContent = data.power.toFixed(0);
+            powerEl.classList.remove('zero-load'); // حذف کلاس رنگ قرمز
+        }
     }
     
     // سایر مقادیر
-    if (data.energy !== undefined) document.getElementById('total-energy').textContent = data.energy.toFixed(2);
+    if (data.energy !== undefined && data.energy !== null) {
+        const energyEl = document.getElementById('total-energy');
+        if (energyEl) energyEl.textContent = data.energy.toFixed(2);
+    }
     
     // برای توان راکتیو و ظاهری، مقدار واقعی را نشان دهیم
-    if (data.reactivePower !== undefined) {
+    if (data.reactivePower !== undefined && data.reactivePower !== null) {
         const reactiveEl = document.getElementById('reactivePower');
-        reactiveEl.textContent = data.reactivePower.toFixed(0);
+        if (reactiveEl) reactiveEl.textContent = data.reactivePower.toFixed(0);
     }
     
-    if (data.apparentPower !== undefined) {
+    if (data.apparentPower !== undefined && data.apparentPower !== null) {
         const apparentEl = document.getElementById('apparentPower');
-        apparentEl.textContent = data.apparentPower.toFixed(0);
+        if (apparentEl) apparentEl.textContent = data.apparentPower.toFixed(0);
     }
     
-    if (data.frequency !== undefined) document.getElementById('frequency').textContent = data.frequency.toFixed(1);
+    if (data.frequency !== undefined && data.frequency !== null) {
+        const freqEl = document.getElementById('frequency');
+        if (freqEl) freqEl.textContent = data.frequency.toFixed(1);
+    }
     
     // برای ضریب توان، مقدار واقعی را نشان دهیم
-    if (data.pf !== undefined) {
+    if (data.pf !== undefined && data.pf !== null) {
         const pfEl = document.getElementById('pf');
-        pfEl.textContent = data.pf.toFixed(2);
+        if (pfEl) pfEl.textContent = data.pf.toFixed(2);
     }
 }
 
@@ -361,8 +395,18 @@ function updateTrendIcon(element, newValue, oldValue) {
 
 function updateAllCharts(data) {
     if (!data || Object.keys(data).length === 0) return;
-    const now = new Date();
-    const timestamp = now;
+    
+    // استفاده از زمان ESP32 اگر موجود باشد، در غیر این صورت از زمان کلاینت
+    let timestamp;
+    if (data.timestamp !== undefined) {
+        // ESP32 زمان را با Tehran offset ارسال می‌کند
+        // باید آن را به UTC تبدیل کنیم تا JavaScript درست تفسیر کند
+        const utcTime = data.timestamp - (3.5 * 60 * 60); // کم کردن offset تهران
+        timestamp = new Date(utcTime * 1000); // تبدیل epoch به Date
+    } else {
+        timestamp = new Date(); // زمان کلاینت
+    }
+    
     ['power','voltage','current','energy','pf','frequency'].forEach(key => {
         if (data[key] !== undefined) {
             chartData[key].push({x: timestamp, y: data[key]});
@@ -387,6 +431,112 @@ function formatUptime(seconds) {
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+// تابع تبدیل تاریخ میلادی به شمسی (ساده و سریع)
+function toJalali(gy, gm, gd) {
+    // الگوریتم تبدیل ساده (برگرفته از jalaali-js)
+    var g_d_m = [0,31,59,90,120,151,181,212,243,273,304,334];
+    var jy = (gy <= 1600) ? 0 : 979;
+    gy -= (gy <= 1600) ? 621 : 1600;
+    var gy2 = (gm > 2) ? (gy + 1) : gy;
+    var days = (365 * gy) + Math.floor((gy2 + 3) / 4) - Math.floor((gy2 + 99) / 100) + Math.floor((gy2 + 399) / 400) - 80 + gd + g_d_m[gm - 1];
+    jy += 33 * Math.floor(days / 12053);
+    days %= 12053;
+    jy += 4 * Math.floor(days / 1461);
+    days %= 1461;
+    if (days > 365) {
+        jy += Math.floor((days - 1) / 365);
+        days = (days - 1) % 365;
+    }
+    var jm = (days < 186) ? 1 + Math.floor(days / 31) : 7 + Math.floor((days - 186) / 30);
+    var jd = 1 + ((days < 186) ? (days % 31) : ((days - 186) % 30));
+    return {jy, jm, jd};
+}
+
+function pad2(n) { return n < 10 ? '0' + n : n; }
+
+function updatePersianDateTimeNavbar() {
+    let now;
+    
+    // اگر زمان ESP32 موجود باشد، از آن استفاده کن
+    if (esp32Time) {
+        // ESP32 زمان را با offset تهران ارسال می‌کند، اما JavaScript آن را local time تفسیر می‌کند
+        // باید آن را به UTC تبدیل کنیم
+        const utcTime = esp32Time - (3.5 * 60 * 60); // کم کردن offset تهران
+        now = new Date(utcTime * 1000); // تبدیل epoch به Date
+        
+        // Debug: نمایش زمان ESP32 (کامنت شده برای کاهش حجم console)
+        /*
+        console.log('=== TIME DEBUG ===');
+        console.log('ESP32 Time (with Tehran offset):', esp32Time);
+        console.log('UTC Time (without offset):', utcTime);
+        console.log('Date Object:', now);
+        console.log('Hours:', now.getHours(), 'Minutes:', now.getMinutes(), 'Seconds:', now.getSeconds());
+        console.log('ISO String:', now.toISOString());
+        console.log('Local String:', now.toString());
+        console.log('==================');
+        */
+    } else {
+        // در غیر این صورت از زمان کلاینت استفاده کن
+        now = new Date();
+        // تبدیل به وقت تهران
+        const tehranOffset = 3.5 * 60; // دقیقه
+        const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+        now = new Date(utc + tehranOffset * 60000);
+    }
+    
+    // تبدیل به شمسی
+    const gYear = now.getFullYear();
+    const gMonth = now.getMonth() + 1;
+    const gDay = now.getDate();
+    const {jy, jm, jd} = toJalali(gYear, gMonth, gDay);
+    
+    // نمایش ساعت و تاریخ
+    const h = pad2(now.getHours());
+    const m = pad2(now.getMinutes());
+    const s = pad2(now.getSeconds());
+    const persianDate = `${jy}/${pad2(jm)}/${pad2(jd)}`;
+    const persianTime = `${h}:${m}:${s}`;
+    
+    const timeEl = document.getElementById('persian-navbar-time');
+    const dateEl = document.getElementById('persian-navbar-date');
+    
+    if (timeEl) {
+        timeEl.textContent = persianTime;
+        // اضافه کردن نشانگر منبع زمان
+        if (esp32TimeSource === 'NTP') {
+            timeEl.title = 'زمان دقیق (NTP)';
+        } else {
+            timeEl.title = 'زمان داخلی (RTC)';
+        }
+    }
+    if (dateEl) dateEl.textContent = persianDate;
+}
+setInterval(updatePersianDateTimeNavbar, 1000);
+
+// تابع نمایش وضعیت time sync
+function updateTimeSyncStatus() {
+    fetch('/api/time-status')
+        .then(response => response.json())
+        .then(data => {
+            timeSyncStatus = data.status;
+            esp32TimeSource = data.timeSource;
+            
+            // بروزرسانی نمایش time در navbar
+            const timeEl = document.getElementById('persian-navbar-time');
+            if (timeEl) {
+                if (data.status === 'SYNCING') {
+                    timeEl.textContent = 'Syncing...';
+                    timeEl.title = 'Time sync in progress';
+                } else {
+                    timeEl.title = data.message;
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching time status:', error);
+        });
 }
 
 // تابع راه‌اندازی نمودار مالتی‌اکسیز حرفه‌ای
@@ -676,6 +826,13 @@ function initApp() {
     // دکمه ریست انرژی
     document.querySelector('.reset-energy-btn')?.addEventListener('click', resetEnergyCounter);
     
+    // دکمه‌های کنترل لاگ کردن
+    document.getElementById('toggle-logging-btn')?.addEventListener('click', toggleHistoryLogging);
+    document.getElementById('start-stop-logging-btn')?.addEventListener('click', startStopLogging);
+    
+    // بارگذاری وضعیت لاگ کردن
+    loadLoggingStatus();
+    
     // دکمه ریست مقیاس نمودار - روش جدید با مکان مشخص
     const chartPeriodDiv = document.querySelector('.chart-period');
     if (chartPeriodDiv) {
@@ -710,6 +867,10 @@ function initApp() {
     // راه‌اندازی کنترل‌های نمودار
     setupChartLegend();
     setupChartPeriod();
+    
+    // بروزرسانی وضعیت time sync
+    updateTimeSyncStatus();
+    setInterval(updateTimeSyncStatus, 5000); // هر 5 ثانیه چک کن
     
     // در مورد نسخه دمو، داده‌های تستی را پر می‌کنیم
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
@@ -822,4 +983,131 @@ function toggleSerialLogging() {
     .finally(() => {
         btn.disabled = false;
     });
+}
+
+// تابع برای فعال/غیرفعال کردن قابلیت لاگ کردن تاریخی
+function toggleHistoryLogging() {
+    const btn = document.getElementById('toggle-logging-btn');
+    
+    if (!btn) return;
+    
+    btn.disabled = true;
+    
+    fetch('/api/toggle-history-logging', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.enabled) {
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-secondary');
+            btn.innerHTML = '<i class="bx bx-data"></i>';
+            btn.title = 'غیرفعال کردن لاگ کردن';
+            console.log('قابلیت لاگ کردن تاریخی فعال شد');
+        } else {
+            btn.classList.remove('btn-secondary');
+            btn.classList.add('btn-success');
+            btn.innerHTML = '<i class="bx bx-data"></i>';
+            btn.title = 'فعال کردن لاگ کردن';
+            console.log('قابلیت لاگ کردن تاریخی غیرفعال شد');
+        }
+        
+        // بروزرسانی وضعیت دکمه شروع/توقف
+        updateStartStopButton(data.active);
+    })
+    .catch(error => {
+        console.error('خطا در تغییر وضعیت لاگ کردن تاریخی:', error);
+    })
+    .finally(() => {
+        btn.disabled = false;
+    });
+}
+
+// تابع برای شروع/توقف لاگ کردن فعال
+function startStopLogging() {
+    const btn = document.getElementById('start-stop-logging-btn');
+    
+    if (!btn) return;
+    
+    btn.disabled = true;
+    
+    fetch('/api/start-stop-logging', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.active) {
+            btn.classList.remove('btn-warning');
+            btn.classList.add('btn-danger');
+            btn.innerHTML = '<i class="bx bx-stop"></i>';
+            btn.title = 'توقف لاگ کردن';
+            console.log('لاگ کردن شروع شد');
+        } else {
+            btn.classList.remove('btn-danger');
+            btn.classList.add('btn-warning');
+            btn.innerHTML = '<i class="bx bx-play"></i>';
+            btn.title = 'شروع لاگ کردن';
+            console.log('لاگ کردن متوقف شد');
+        }
+    })
+    .catch(error => {
+        console.error('خطا در شروع/توقف لاگ کردن:', error);
+    })
+    .finally(() => {
+        btn.disabled = false;
+    });
+}
+
+// تابع برای بروزرسانی وضعیت دکمه شروع/توقف
+function updateStartStopButton(isActive) {
+    const btn = document.getElementById('start-stop-logging-btn');
+    
+    if (!btn) return;
+    
+    if (isActive) {
+        btn.classList.remove('btn-warning');
+        btn.classList.add('btn-danger');
+        btn.innerHTML = '<i class="bx bx-stop"></i>';
+        btn.title = 'توقف لاگ کردن';
+    } else {
+        btn.classList.remove('btn-danger');
+        btn.classList.add('btn-warning');
+        btn.innerHTML = '<i class="bx bx-play"></i>';
+        btn.title = 'شروع لاگ کردن';
+    }
+}
+
+// تابع برای بارگذاری وضعیت لاگ کردن
+function loadLoggingStatus() {
+    fetch('/api/logging-status')
+        .then(response => response.json())
+        .then(data => {
+            const toggleBtn = document.getElementById('toggle-logging-btn');
+            const startStopBtn = document.getElementById('start-stop-logging-btn');
+            
+            if (toggleBtn) {
+                if (data.historyLoggingEnabled) {
+                    toggleBtn.classList.remove('btn-success');
+                    toggleBtn.classList.add('btn-secondary');
+                    toggleBtn.title = 'غیرفعال کردن لاگ کردن';
+                } else {
+                    toggleBtn.classList.remove('btn-secondary');
+                    toggleBtn.classList.add('btn-success');
+                    toggleBtn.title = 'فعال کردن لاگ کردن';
+                }
+            }
+            
+            if (startStopBtn) {
+                updateStartStopButton(data.historyLoggingActive);
+            }
+        })
+        .catch(error => {
+            console.error('خطا در بارگذاری وضعیت لاگ کردن:', error);
+        });
 } 

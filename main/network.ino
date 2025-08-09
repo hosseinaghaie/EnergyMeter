@@ -33,6 +33,9 @@ void onWiFiGotIP(WiFiEvent_t event, WiFiEventInfo_t info) {
     Serial.print("RSSI: ");
     Serial.println(WiFi.RSSI());
     
+    // Temporarily disabled to prevent web server issues
+    // checkForLateSync();
+    
     // نمایش وضعیت اتصال با LED سبز
     setLEDColor(LED_COLOR_GREEN);
 }
@@ -78,6 +81,38 @@ void wifi_event_handler_init() {
     WiFi.onEvent(onWiFiAPStationDisconnected, ARDUINO_EVENT_WIFI_AP_STADISCONNECTED);
 }
 
+// تابع نمایش وضعیت اتصال WiFi
+void printWiFiStatus() {
+    wl_status_t status = WiFi.status();
+    switch (status) {
+        case WL_NO_SSID_AVAIL:
+            Serial.println("❌ WiFi: No SSID available");
+            break;
+        case WL_SCAN_COMPLETED:
+            Serial.println("✅ WiFi: Scan completed");
+            break;
+        case WL_CONNECTED:
+            Serial.println("✅ WiFi: Connected");
+            Serial.print("IP: "); Serial.println(WiFi.localIP());
+            Serial.print("SSID: "); Serial.println(WiFi.SSID());
+            Serial.print("RSSI: "); Serial.println(WiFi.RSSI());
+            break;
+        case WL_CONNECT_FAILED:
+            Serial.println("❌ WiFi: Connection failed");
+            break;
+        case WL_IDLE_STATUS:
+            Serial.println("⏳ WiFi: Idle status");
+            break;
+        case WL_DISCONNECTED:
+            Serial.println("❌ WiFi: Disconnected");
+            break;
+        default:
+            Serial.print("❓ WiFi: Unknown status - ");
+            Serial.println(status);
+            break;
+    }
+}
+
 // --- WiFi Setup (Dual Mode: AP + STA) ---
 void setupNetworkDual(const NetworkConfig &net) {
     wifi_event_handler_init();
@@ -104,30 +139,21 @@ void setupNetworkDual(const NetworkConfig &net) {
             WiFi.config(ip, gateway, subnet);
             Serial.println("Static IP set for STA");
         }
+        
         WiFi.setAutoReconnect(true);
+        
+        // شروع اتصال WiFi بدون delay
+        Serial.println("⏳ Starting WiFi connection...");
         WiFi.begin(net.clientSSID.c_str(), net.clientPassword.c_str());
         Serial.print("Connecting to WiFi: ");
         Serial.println(net.clientSSID);
+        Serial.println("WiFi connection initiated - events will handle status updates");
     }
 }
 
-// --- mDNS & NTP ---
-void syncTimeWithNTP() {
-    configTime(deviceConfig.time.gmtOffset * 60, 0, deviceConfig.time.ntpServer.c_str());
-    struct tm timeinfo;
-    if (getLocalTime(&timeinfo, 10000)) {
-        Serial.println("NTP sync OK");
-    } else {
-        Serial.println("NTP sync failed");
-    }
-}
-
-time_t getCurrentTime() {
-    return time(nullptr);
-}
-
+// --- mDNS Setup ---
 bool setupNetwork(const DeviceConfig &config) {
-    // پرینت کامل تنظیمات شبکه
+    // Print complete network configuration
     Serial.println("\n===== Network Config =====");
     Serial.print("AP Enable: "); Serial.println(config.network.apEnable);
     Serial.print("AP SSID: "); Serial.println(config.network.apSSID);
@@ -144,8 +170,15 @@ bool setupNetwork(const DeviceConfig &config) {
     Serial.print("NTP Server: "); Serial.println(config.time.ntpServer);
     Serial.print("GMT Offset: "); Serial.println(config.time.gmtOffset);
     Serial.println("========================\n");
+    
+    // Setup WiFi (AP + STA mode)
     setupNetworkDual(config.network);
-    // mDNS
+    
+    // نمایش وضعیت WiFi بعد از setup
+    Serial.println("📡 Current WiFi status:");
+    printWiFiStatus();
+    
+    // Setup mDNS service
     if (config.network.mdnsName.length() > 0) {
         if (MDNS.begin(config.network.mdnsName.c_str())) {
             Serial.println("mDNS started: " + config.network.mdnsName + ".local");
@@ -154,20 +187,21 @@ bool setupNetwork(const DeviceConfig &config) {
             Serial.println("Failed to start mDNS!");
         }
     }
-    // NTP و ست کردن RTC داخلی
+    
+    // Note: NTP sync is now handled by TimeManager in main.ino
+    // This ensures centralized time management
+    
+    // Update LED status based on network connection
     if (WiFi.status() == WL_CONNECTED) {
-        syncTimeWithNTP();
-        // اتصال موفق - LED سبز
+        // Successful connection - Green LED
         setLEDColor(LED_COLOR_GREEN);
     } else {
-        Serial.println("NTP not started: WiFi not connected.");
-        // بروزرسانی وضعیت LED براساس وضعیت شبکه
+        Serial.println("WiFi not connected - NTP will be handled by TimeManager");
+        // Update LED status based on network state
         updateNetworkLEDStatus();
     }
     return true;
 }
 
 // تابع مدیریت AP دیگر نیاز نیست چون AP همیشه فعال است
-void manageAP() {}
-
-// The old getNTPTime() function is removed as it's been replaced by getCurrentTime() 
+void manageAP() {} 

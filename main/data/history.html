@@ -3,12 +3,178 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تاریخچه انرژی متر</title>
+    <title>تحلیل تاریخچه انرژی - انرژی متر هوشمند</title>
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <link href="css/boxicons.min.css" rel="stylesheet">
     <link href="css/style.css" rel="stylesheet">
+    <style>
+        .analysis-card {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        .chart-container {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+        .peak-indicator {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: inline-block;
+            margin: 5px;
+        }
+        .avg-indicator {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: inline-block;
+            margin: 5px;
+        }
+        .solar-recommendation {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 15px;
+            padding: 20px;
+            color: white;
+            margin-top: 20px;
+        }
+        .time-period-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            transition: all 0.3s ease;
+        }
+        .time-period-btn:hover, .time-period-btn.active {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border-color: transparent;
+            transform: scale(1.05);
+        }
+        .data-type-selector {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            border-radius: 10px;
+            padding: 10px;
+        }
+        .data-type-selector option {
+            background: #2c3e50;
+            color: white;
+        }
+        .export-btn {
+            background: linear-gradient(45deg, #11998e, #38ef7d);
+            border: none;
+            border-radius: 25px;
+            padding: 12px 25px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .export-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(17, 153, 142, 0.4);
+        }
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .no-data-message {
+            text-align: center;
+            padding: 40px;
+            color: #95a5a6;
+            font-size: 18px;
+        }
+        .energy-consumption-analysis {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .hourly-analysis {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        .peak-hours {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            border-radius: 10px;
+            padding: 10px;
+            margin: 5px 0;
+            color: white;
+        }
+        .off-peak-hours {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            border-radius: 10px;
+            padding: 10px;
+            margin: 5px 0;
+            color: white;
+        }
+        .file-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        .file-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+        .file-card.selected {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            border: 2px solid #fff;
+        }
+        .file-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #ff6b6b, #ee5a24);
+        }
+        .file-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+        .file-stat {
+            text-align: center;
+            padding: 5px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+            margin: 2px;
+        }
+        .file-checkbox {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            transform: scale(1.2);
+        }
+    </style>
 </head>
 <body class="dark-theme">
+    <!-- Navigation Bar -->
     <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container-fluid">
             <a class="navbar-brand" href="index.html">
@@ -29,7 +195,7 @@
                     <li class="nav-item">
                         <a class="nav-link active" href="history.html">
                             <i class='bx bx-history'></i>
-                            تاریخچه
+                            تحلیل تاریخچه
                         </a>
                     </li>
                     <li class="nav-item">
@@ -49,77 +215,231 @@
         </div>
     </nav>
 
+    <!-- Main Content -->
     <div class="container-fluid mt-4">
-        <div class="row mb-3">
-            <div class="col-lg-3 col-md-6 mb-2">
-                <label class="form-label">از تاریخ:</label>
-                <input type="datetime-local" id="fromDate" class="form-control bg-dark text-light border-0">
-            </div>
-            <div class="col-lg-3 col-md-6 mb-2">
-                <label class="form-label">تا تاریخ:</label>
-                <input type="datetime-local" id="toDate" class="form-control bg-dark text-light border-0">
-            </div>
-            <div class="col-lg-3 col-md-6 mb-2">
-                <label class="form-label">انتخاب داده:</label>
-                <select id="historyType" class="form-select bg-dark text-light border-0">
-                    <option value="power">توان (W)</option>
-                    <option value="voltage">ولتاژ (V)</option>
-                    <option value="current">جریان (A)</option>
-                    <option value="energy">انرژی (kWh)</option>
-                    <option value="pf">ضریب توان</option>
-                    <option value="frequency">فرکانس (Hz)</option>
-                </select>
-            </div>
-            <div class="col-lg-3 col-md-6 mb-2 d-flex align-items-end">
-                <button class="btn btn-success w-100" id="loadHistory"><i class='bx bx-search'></i> نمایش تاریخچه</button>
-            </div>
-        </div>
-
-        <div class="row mb-3">
-            <div class="col-lg-9 mb-3">
-                <div class="chart-card" style="height: 350px;">
-                    <h6 class="mb-2">نمودار تاریخچه</h6>
-                    <canvas id="historyChart" style="height: 300px;"></canvas>
-                </div>
-            </div>
-            <div class="col-lg-3 mb-3">
-                <div class="stat-card flex-column align-items-start" style="height: 350px;">
-                    <h6 class="mb-3 w-100 text-center">آمار کلی بازه انتخابی</h6>
-                    <div class="w-100 mb-2"><span>میانگین:</span> <span id="avgVal">--</span></div>
-                    <div class="w-100 mb-2"><span>کمینه:</span> <span id="minVal">--</span></div>
-                    <div class="w-100 mb-2"><span>بیشینه:</span> <span id="maxVal">--</span></div>
-                    <div class="w-100 mb-2"><span>مجموع:</span> <span id="sumVal">--</span></div>
-                    <button class="btn btn-outline-info mt-auto w-100" id="downloadCSV"><i class='bx bx-download'></i> دانلود CSV</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="row">
+        <!-- Analysis Header -->
+        <div class="row mb-4">
             <div class="col-12">
-                <div class="card bg-dark text-light">
-                    <div class="card-body p-2">
-                        <h6 class="mb-3">جدول داده‌ها</h6>
-                        <div class="table-responsive">
-                            <table class="table table-dark table-striped table-bordered align-middle" id="historyTable">
-                                <thead>
-                                    <tr>
-                                        <th>تاریخ و ساعت</th>
-                                        <th>مقدار</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <!-- داده‌ها اینجا قرار می‌گیرند -->
-                                </tbody>
-                            </table>
+                <div class="analysis-card text-white p-4">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h3><i class='bx bx-line-chart'></i> تحلیل پیشرفته مصرف انرژی</h3>
+                            <p class="mb-0">تحلیل دقیق مصرف انرژی برای طراحی بهینه سیستم خورشیدی</p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="d-flex justify-content-end gap-2">
+                                <button class="btn btn-outline-light btn-sm" id="exportPDF">
+                                    <i class='bx bx-file-pdf'></i> گزارش PDF
+                                </button>
+                                <button class="btn btn-outline-light btn-sm" id="exportExcel">
+                                    <i class='bx bx-spreadsheet'></i> اکسل
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <!-- Control Panel -->
+        <div class="row mb-4">
+            <div class="col-lg-4 col-md-6 mb-3">
+                <label class="form-label text-light">نوع تحلیل:</label>
+                <select id="analysisType" class="form-select data-type-selector">
+                    <option value="power">تحلیل توان مصرفی</option>
+                    <option value="energy">تحلیل انرژی کل</option>
+                    <option value="voltage">تحلیل ولتاژ</option>
+                    <option value="current">تحلیل جریان</option>
+                    <option value="pf">تحلیل ضریب توان</option>
+                </select>
+            </div>
+            <div class="col-lg-4 col-md-6 mb-3">
+                <label class="form-label text-light">عملیات:</label>
+                <div class="btn-group w-100" role="group">
+                    <button class="btn export-btn text-white" id="loadAnalysis">
+                        <i class='bx bx-search'></i> تحلیل
+                    </button>
+                    <button class="btn btn-outline-info" id="solarRecommendation">
+                        <i class='bx bx-sun'></i> پیشنهاد خورشیدی
+                    </button>
+                </div>
+            </div>
+            <div class="col-lg-4 col-md-6 mb-3">
+                <label class="form-label text-light">گزارش:</label>
+                <div class="btn-group w-100" role="group">
+                    <button class="btn btn-outline-light btn-sm" id="exportPDF">
+                        <i class='bx bx-file-pdf'></i> PDF
+                    </button>
+                    <button class="btn btn-outline-light btn-sm" id="exportExcel">
+                        <i class='bx bx-spreadsheet'></i> اکسل
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Available Files Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card bg-dark text-light">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class='bx bx-folder-open'></i> فایل‌های موجود
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="filesList" class="row">
+                            <!-- فایل‌ها اینجا نمایش داده می‌شوند -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div class="loading-spinner" id="loadingSpinner">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">در حال بارگذاری...</span>
+            </div>
+            <p class="mt-2 text-light">در حال تحلیل داده‌ها...</p>
+        </div>
+
+        <!-- Main Analysis Content -->
+        <div id="analysisContent" style="display: none;">
+            <!-- Statistics Cards -->
+            <div class="row mb-4">
+                <div class="col-lg-3 col-md-6 mb-3">
+                    <div class="stat-card text-white p-3 text-center">
+                        <i class='bx bx-trending-up' style="font-size: 2rem;"></i>
+                        <h4 class="mt-2" id="peakValue">--</h4>
+                        <p class="mb-0">حداکثر مصرف</p>
+                        <div class="peak-indicator mt-2">پیک مصرف</div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-3">
+                    <div class="stat-card text-white p-3 text-center">
+                        <i class='bx bx-calculator' style="font-size: 2rem;"></i>
+                        <h4 class="mt-2" id="avgValue">--</h4>
+                        <p class="mb-0">میانگین مصرف</p>
+                        <div class="avg-indicator mt-2">مصرف متوسط</div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-3">
+                    <div class="stat-card text-white p-3 text-center">
+                        <i class='bx bx-time' style="font-size: 2rem;"></i>
+                        <h4 class="mt-2" id="totalEnergy">--</h4>
+                        <p class="mb-0">انرژی کل</p>
+                        <small>کیلووات ساعت</small>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-3">
+                    <div class="stat-card text-white p-3 text-center">
+                        <i class='bx bx-calendar' style="font-size: 2rem;"></i>
+                        <h4 class="mt-2" id="peakHours">--</h4>
+                        <p class="mb-0">ساعات پیک</p>
+                        <small>ساعت در روز</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="row mb-4">
+                <div class="col-lg-8 mb-3">
+                    <div class="chart-container">
+                        <h5 class="text-light mb-3">
+                            <i class='bx bx-line-chart'></i> نمودار مصرف انرژی
+                        </h5>
+                        <canvas id="mainChart" style="height: 400px;"></canvas>
+                    </div>
+                </div>
+                <div class="col-lg-4 mb-3">
+                    <div class="chart-container">
+                        <h5 class="text-light mb-3">
+                            <i class='bx bx-pie-chart'></i> توزیع مصرف ساعتی
+                        </h5>
+                        <canvas id="hourlyChart" style="height: 400px;"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Energy Consumption Analysis -->
+            <div class="row">
+                <div class="col-lg-8 mb-3">
+                    <div class="energy-consumption-analysis">
+                        <h5 class="text-white mb-3">
+                            <i class='bx bx-bulb'></i> تحلیل مصرف انرژی
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="text-white">ساعات پیک مصرف:</h6>
+                                <div id="peakHoursList">
+                                    <!-- Peak hours will be populated here -->
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-white">ساعات کم‌مصرف:</h6>
+                                <div id="offPeakHoursList">
+                                    <!-- Off-peak hours will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4 mb-3">
+                    <div class="solar-recommendation">
+                        <h5 class="text-white mb-3">
+                            <i class='bx bx-sun'></i> پیشنهاد سیستم خورشیدی
+                        </h5>
+                        <div id="solarRecommendations">
+                            <!-- Solar recommendations will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Data Table -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card bg-dark text-light">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class='bx bx-table'></i> جدول داده‌های تفصیلی
+                            </h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-dark table-striped table-bordered align-middle mb-0" id="detailedTable">
+                                    <thead>
+                                        <tr>
+                                            <th>تاریخ و ساعت</th>
+                                            <th>توان (W)</th>
+                                            <th>ولتاژ (V)</th>
+                                            <th>جریان (A)</th>
+                                            <th>انرژی (kWh)</th>
+                                            <th>ضریب توان</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Detailed data will be populated here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- No Data Message -->
+        <div id="noDataMessage" class="no-data-message" style="display: none;">
+            <i class='bx bx-data' style="font-size: 3rem; color: #95a5a6;"></i>
+            <h4 class="mt-3">هیچ داده‌ای یافت نشد</h4>
+            <p>برای بازه زمانی انتخاب شده هیچ داده‌ای موجود نیست.</p>
+        </div>
     </div>
 
     <script src="js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="js/history.js"></script>
 </body>
 </html> 

@@ -2,6 +2,9 @@
 ///////////////////////////
 WiFiUDP ntpUDP;
 
+// Forward declarations
+void updateWebSocket();
+
 /**
  * RGB LED Control Functions
  * -------------------------
@@ -85,16 +88,41 @@ void setup() {
   }
   Serial.println("Network setup done");
   
+  // Wait for WiFi connection before starting web server
+  Serial.println("⏳ Waiting for WiFi connection before starting web server...");
+  int wifiWaitTime = 0;
+  while (WiFi.status() != WL_CONNECTED && wifiWaitTime < 10000) {
+    delay(100);
+    wifiWaitTime += 100;
+    if (wifiWaitTime % 1000 == 0) {
+      Serial.print(".");
+    }
+  }
+  Serial.println();
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("✅ WiFi connected, starting web server...");
+  } else {
+    Serial.println("⚠️ WiFi not connected, starting web server anyway...");
+  }
+  
+  // Initialize web server
+  setupWebServer();
+  Serial.println("Web server setup done");
+  
+  // راه‌اندازی TimeManager (در background)
+  if (initTimeManager()) {
+    Serial.println("TimeManager initialized with NTP");
+  } else {
+    Serial.println("TimeManager initialized with internal RTC");
+  }
+  
   // بروزرسانی وضعیت LED بر اساس وضعیت شبکه
   updateNetworkLEDStatus();
 
   // Initialize PZEM sensor
   setupSensor();
   Serial.println("Sensor setup done");
-
-  // Initialize web server and API endpoints
-  setupWebServer();
-  Serial.println("Web server setup done");
 
   Serial.println("Setup completed!");
 }
@@ -131,21 +159,9 @@ void loop() {
     lastWebSocketUpdate = millis();
   }
 
-  // Update NTP time every hour
-  static unsigned long lastNTPUpdate = 0;
-  if (millis() - lastNTPUpdate >= 3600000) {
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.println("Performing hourly NTP sync...");
-      syncTimeWithNTP();
-      Serial.print("Current system time: ");
-      time_t now = getCurrentTime();
-      Serial.println(now);
-    } else {
-      Serial.println("Skipping NTP sync - WiFi not connected");
-    }
-    lastNTPUpdate = millis();
-  }
-  
+  // بروزرسانی TimeManager (سینک خودکار NTP)
+  updateTimeManager();
+
   // بررسی وضعیت شبکه هر 10 ثانیه و بروزرسانی LED
   static unsigned long lastLEDUpdate = 0;
   if (millis() - lastLEDUpdate >= 10000) {

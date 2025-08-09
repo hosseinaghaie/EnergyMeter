@@ -81,7 +81,7 @@ Sample readPZEM() {
     sample.energy = pzem.energy();
     sample.frequency = pzem.frequency();
     sample.pf = pzem.pf();
-    sample.timestamp = getCurrentTime();
+    sample.timestamp = getCurrentTimestamp(); // Use TimeManager function
     
     // محاسبه توان ظاهری (VA = V * I) - طبق دیتاشیت
     if (sample.voltage > MIN_VOLTAGE && sample.current > 0) {
@@ -168,7 +168,7 @@ Sample calculateAverage() {
         avg.apparentPower /= validSamples;
         avg.reactivePower /= validSamples;
     }
-    avg.timestamp = getCurrentTime();
+    avg.timestamp = getCurrentTimestamp(); // Use TimeManager function
     return avg;
 }
 
@@ -178,6 +178,9 @@ Sample processNewSample() {
     
     // لاگ کردن مقادیر خام سنسور قبل از هر پردازشی
     logSensorValues(newSample);
+    
+    // لاگ کردن سمپل در فایل CSV
+    logSample(newSample);
     
     // همیشه نمونه جدید را قبول کنیم، حتی اگر تغییرات ناگهانی باشد
     // (به‌طور مثال وقتی مصرف‌کننده قطع می‌شود)
@@ -195,7 +198,6 @@ void setupSensor() {
     
     // اطمینان از استفاده از روش مستقیم به‌روزرسانی
     deviceConfig.advanced.updateMethod = 0; // DIRECT
-    Serial.println("Update method set to DIRECT");
 }
 
 // Returns the current averaged sensor values
@@ -242,4 +244,318 @@ void resetSampleBuffer() {
     
     // ریست مقادیر حداکثر ذخیره شده
     lastReportedSample = Sample();
+} 
+
+// ===== LOGGING FUNCTIONS =====
+
+// تابع دریافت نام فایل روزانه (YYYY-MM-DD.csv)
+String getCurrentDateString() {
+    time_t now;
+    time(&now);
+    
+    // اضافه کردن offset تهران برای نام فایل
+    time_t localTime = now + (deviceConfig.time.gmtOffset * 60);
+    struct tm* timeinfo = gmtime(&localTime);
+    
+    char dateStr[11];
+    strftime(dateStr, sizeof(dateStr), "%Y-%m-%d", timeinfo);
+    return String(dateStr) + ".csv";
+}
+
+// تابع ذخیره سمپل در فایل CSV
+bool logSample(const Sample &sample) {
+    // بررسی فعال بودن لاگ کردن تاریخی
+    if (!deviceConfig.advanced.historyLoggingActive) {
+        return false; // اگر لاگ کردن غیرفعال است، هیچ کاری نکن
+    }
+    
+    // بررسی وجود پوشه data
+    if (!LittleFS.exists("/data")) {
+        if (!LittleFS.mkdir("/data")) {
+            Serial.println("❌ Failed to create /data directory");
+            return false;
+        }
+    }
+    
+    String fileName = "/data/" + getCurrentDateString();
+    File file = LittleFS.open(fileName, "a"); // append mode
+    
+    if (!file) {
+        Serial.println("❌ Failed to open file for logging: " + fileName);
+        return false;
+    }
+    
+    // اگر فایل خالی است، header را اضافه کنیم
+    if (file.size() == 0) {
+        file.println("timestamp,voltage,current,power,energy,frequency,pf,apparentPower,reactivePower");
+    }
+    
+    // تبدیل سمپل به فرمت CSV
+    String csvLine = String(sample.timestamp) + "," +
+                     String(sample.voltage, 2) + "," +
+                     String(sample.current, 3) + "," +
+                     String(sample.power, 2) + "," +
+                     String(sample.energy, 3) + "," +
+                     String(sample.frequency, 1) + "," +
+                     String(sample.pf, 3) + "," +
+                     String(sample.apparentPower, 2) + "," +
+                     String(sample.reactivePower, 2);
+    
+    file.println(csvLine);
+    file.close();
+    
+    // لاگ برای دیباگ (هر 100 سمپل)
+    static int logCounter = 0;
+    logCounter++;
+    if (logCounter % 100 == 0) {
+        Serial.printf("📊 Logged sample #%d to %s\n", logCounter, fileName.c_str());
+    }
+    
+    return true;
+}
+
+// تابع خواندن داده‌های تاریخی از فایل
+String getHistoryData(const String &date, int maxLines = 1000) {
+    String fileName = "/data/" + date + ".csv";
+    
+    if (!LittleFS.exists(fileName)) {
+        return "[]"; // فایل وجود ندارد
+    }
+    
+    File file = LittleFS.open(fileName, "r");
+    if (!file) {
+        return "[]"; // خطا در باز کردن فایل
+    }
+    
+    String result = "[";
+    int lineCount = 0;
+    bool firstLine = true;
+    
+    while (file.available() && lineCount < maxLines) {
+        String line = file.readStringUntil('\n');
+        line.trim();
+        
+        // رد کردن header و خطوط خالی
+        if (line.length() > 0 && !line.startsWith("timestamp")) {
+            if (!firstLine) result += ",";
+            
+            // تبدیل CSV به JSON
+            String jsonLine = csvToJson(line);
+            result += jsonLine;
+            firstLine = false;
+            lineCount++;
+        }
+    }
+    
+    result += "]";
+    file.close();
+    return result;
+}
+
+// تابع تبدیل خط CSV به JSON
+String csvToJson(const String &csvLine) {
+    // تقسیم خط CSV به فیلدها
+    String fields[9];
+    int fieldIndex = 0;
+    int startPos = 0;
+    
+    for (int i = 0; i < csvLine.length() && fieldIndex < 9; i++) {
+        if (csvLine.charAt(i) == ',') {
+            fields[fieldIndex] = csvLine.substring(startPos, i);
+            fieldIndex++;
+            startPos = i + 1;
+        }
+    }
+    // آخرین فیلد
+    if (fieldIndex < 9) {
+        fields[fieldIndex] = csvLine.substring(startPos);
+    }
+    
+    // بررسی معتبر بودن داده‌ها
+    for (int i = 0; i < 9; i++) {
+        if (fields[i].length() == 0) {
+            fields[i] = "0"; // مقدار پیش‌فرض برای فیلدهای خالی
+        }
+    }
+    
+    // ساخت JSON با بررسی معتبر بودن مقادیر
+    String json = "{";
+    json += "\"timestamp\":" + fields[0] + ",";
+    json += "\"voltage\":" + fields[1] + ",";
+    json += "\"current\":" + fields[2] + ",";
+    json += "\"power\":" + fields[3] + ",";
+    json += "\"energy\":" + fields[4] + ",";
+    json += "\"frequency\":" + fields[5] + ",";
+    json += "\"pf\":" + fields[6] + ",";
+    json += "\"apparentPower\":" + fields[7] + ",";
+    json += "\"reactivePower\":" + fields[8];
+    json += "}";
+    
+    return json;
+}
+
+// تابع محاسبه آمار از داده‌های تاریخی
+String getHistoryStats(const String &date) {
+    String fileName = "/data/" + date + ".csv";
+    
+    if (!LittleFS.exists(fileName)) {
+        return "{\"error\":\"File not found\"}";
+    }
+    
+    File file = LittleFS.open(fileName, "r");
+    if (!file) {
+        return "{\"error\":\"Cannot open file\"}";
+    }
+    
+    // رد کردن header
+    String header = file.readStringUntil('\n');
+    
+    // محاسبه آمار
+    int count = 0;
+    float sumVoltage = 0, sumCurrent = 0, sumPower = 0, sumEnergy = 0;
+    float minVoltage = 999, maxVoltage = 0;
+    float minCurrent = 999, maxCurrent = 0;
+    float minPower = 999, maxPower = 0;
+    
+    while (file.available()) {
+        String line = file.readStringUntil('\n');
+        line.trim();
+        
+        if (line.length() > 0) {
+            // پردازش خط CSV
+            String fields[9];
+            int fieldIndex = 0;
+            int startPos = 0;
+            
+            for (int i = 0; i < line.length() && fieldIndex < 9; i++) {
+                if (line.charAt(i) == ',') {
+                    fields[fieldIndex] = line.substring(startPos, i);
+                    fieldIndex++;
+                    startPos = i + 1;
+                }
+            }
+            if (fieldIndex < 9) {
+                fields[fieldIndex] = line.substring(startPos);
+            }
+            
+            // تبدیل به float و محاسبه آمار
+            float voltage = fields[1].toFloat();
+            float current = fields[2].toFloat();
+            float power = fields[3].toFloat();
+            float energy = fields[4].toFloat();
+            
+            sumVoltage += voltage;
+            sumCurrent += current;
+            sumPower += power;
+            sumEnergy += energy;
+            
+            if (voltage < minVoltage) minVoltage = voltage;
+            if (voltage > maxVoltage) maxVoltage = voltage;
+            if (current < minCurrent) minCurrent = current;
+            if (current > maxCurrent) maxCurrent = current;
+            if (power < minPower) minPower = power;
+            if (power > maxPower) maxPower = power;
+            
+            count++;
+        }
+    }
+    
+    file.close();
+    
+    if (count == 0) {
+        return "{\"error\":\"No data found\"}";
+    }
+    
+    // ساخت JSON آمار
+    String stats = "{";
+    stats += "\"count\":" + String(count) + ",";
+    stats += "\"voltage\":{\"avg\":" + String(sumVoltage/count, 2) + 
+             ",\"min\":" + String(minVoltage, 2) + 
+             ",\"max\":" + String(maxVoltage, 2) + "},";
+    stats += "\"current\":{\"avg\":" + String(sumCurrent/count, 3) + 
+             ",\"min\":" + String(minCurrent, 3) + 
+             ",\"max\":" + String(maxCurrent, 3) + "},";
+    stats += "\"power\":{\"avg\":" + String(sumPower/count, 2) + 
+             ",\"min\":" + String(minPower, 2) + 
+             ",\"max\":" + String(maxPower, 2) + "},";
+    stats += "\"totalEnergy\":" + String(sumEnergy, 3);
+    stats += "}";
+    
+    return stats;
+} 
+
+// تابع دریافت داده‌های تاریخی در بازه زمانی
+String getHistoryDataRange(const String &fromDate, const String &toDate, int maxLines) {
+    String result = "[";
+    bool firstEntry = true;
+    int lineCount = 0;
+    
+    // برای سادگی، فعلاً فقط از یک روز استفاده می‌کنیم
+    // در آینده می‌توانیم بازه زمانی را پیاده‌سازی کنیم
+    String date = fromDate;
+    if (date.length() > 10) {
+        date = date.substring(0, 10); // فقط YYYY-MM-DD
+    }
+    
+    // بررسی وجود پوشه data
+    if (!LittleFS.exists("/data")) {
+        Serial.println("❌ /data directory not found");
+        return "[]";
+    }
+    
+    String fileName = "/data/" + date + ".csv";
+    Serial.print("🔍 Looking for file: ");
+    Serial.println(fileName);
+    
+    if (!LittleFS.exists(fileName)) {
+        Serial.println("❌ File not found: " + fileName);
+        return "[]";
+    }
+    
+    File file = LittleFS.open(fileName, "r");
+    if (!file) {
+        Serial.println("❌ Cannot open file: " + fileName);
+        return "[]";
+    }
+    
+    Serial.print("✅ File opened, size: ");
+    Serial.println(file.size());
+    
+    // رد کردن header
+    String header = file.readStringUntil('\n');
+    Serial.print("📋 Header: ");
+    Serial.println(header);
+    
+    while (file.available() && lineCount < maxLines) {
+        String line = file.readStringUntil('\n');
+        line.trim();
+        
+        if (line.length() > 0) {
+            if (!firstEntry) result += ",";
+            result += csvToJson(line);
+            firstEntry = false;
+            lineCount++;
+        }
+    }
+    
+    file.close();
+    result += "]";
+    
+    Serial.print("📊 Found ");
+    Serial.print(lineCount);
+    Serial.println(" data points");
+    
+    return result;
+}
+
+// تابع محاسبه آمار از داده‌های تاریخی در بازه زمانی
+String getHistoryStatsRange(const String &fromDate, const String &toDate) {
+    // برای سادگی، فعلاً فقط از یک روز استفاده می‌کنیم
+    String date = fromDate;
+    if (date.length() > 10) {
+        date = date.substring(0, 10); // فقط YYYY-MM-DD
+    }
+    
+    // استفاده از تابع موجود getHistoryStats
+    return getHistoryStats(date);
 } 

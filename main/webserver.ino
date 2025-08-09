@@ -24,7 +24,7 @@ void broadcastData(const Sample &sample) {
     if (ws.count() == 0) return;
     
     // مقداردهی JSON با مقادیر اندازه‌گیری شده
-    StaticJsonDocument<256> doc;
+    StaticJsonDocument<512> doc;
     doc["voltage"] = sample.voltage;
     doc["current"] = sample.current;
     doc["power"] = sample.power;
@@ -33,7 +33,15 @@ void broadcastData(const Sample &sample) {
     doc["pf"] = sample.pf;
     doc["apparentPower"] = sample.apparentPower;
     doc["reactivePower"] = sample.reactivePower;
+    
+    // ارسال timestamp دقیق از ESP32 (epoch time)
     doc["timestamp"] = sample.timestamp;
+    
+    // ارسال زمان فرمت شده برای نمایش
+    doc["formattedTime"] = getFormattedTime();
+    
+    // ارسال وضعیت منبع زمان (NTP یا Internal RTC)
+    doc["timeSource"] = isNTPActive() ? "NTP" : "Internal RTC";
     
     // حذف فیلد zeroLoad - همیشه مقادیر واقعی را نمایش دهیم
     doc["zeroLoad"] = false; // همیشه false
@@ -72,8 +80,8 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
                 resetSampleBuffer();
                 // Send current values immediately to the new client
                 Sample currentSample = getCurrentValues();
-                char buffer[256];
-                StaticJsonDocument<256> doc;
+                char buffer[512];
+                StaticJsonDocument<512> doc;
                 doc["voltage"] = currentSample.voltage;
                 doc["current"] = currentSample.current;
                 doc["power"] = currentSample.power;
@@ -82,7 +90,16 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
                 doc["pf"] = currentSample.pf;
                 doc["apparentPower"] = currentSample.apparentPower;
                 doc["reactivePower"] = currentSample.reactivePower;
+                
+                // ارسال timestamp دقیق از ESP32
                 doc["timestamp"] = currentSample.timestamp;
+                
+                // ارسال زمان فرمت شده برای نمایش
+                doc["formattedTime"] = getFormattedTime();
+                
+                // ارسال وضعیت منبع زمان
+                doc["timeSource"] = isNTPActive() ? "NTP" : "Internal RTC";
+                
                 doc["zeroLoad"] = false;
                 serializeJson(doc, buffer);
                 client->text(buffer);
@@ -262,6 +279,157 @@ void setupWebServer() {
         
         deviceConfig.advanced.updateMethod = method;
         
+        StaticJsonDocument<64> doc;
+        doc["success"] = true;
+        doc["method"] = method;
+        String json;
+        serializeJson(doc, json);
+        request->send(200, "application/json", json);
+    });
+
+    // ===== HISTORY API ENDPOINTS =====
+    
+    // API برای دریافت داده‌های تاریخی
+    server.on("/api/history", HTTP_GET, [](AsyncWebServerRequest *request) {
+        String fromDate = "";
+        String toDate = "";
+        int maxLines = 1000;
+        
+        // دریافت پارامترهای تاریخ
+        if (request->hasParam("fromDate") && request->hasParam("toDate")) {
+            fromDate = request->getParam("fromDate")->value();
+            toDate = request->getParam("toDate")->value();
+        } else if (request->hasParam("date")) {
+            // پشتیبانی از API قدیمی
+            String date = request->getParam("date")->value();
+            fromDate = date;
+            toDate = date;
+        } else {
+            // اگر تاریخ مشخص نشده، از تاریخ امروز استفاده کن
+            time_t now;
+            time(&now);
+            time_t localTime = now + (deviceConfig.time.gmtOffset * 60);
+            struct tm* timeinfo = gmtime(&localTime);
+            char dateStr[11];
+            strftime(dateStr, sizeof(dateStr), "%Y-%m-%d", timeinfo);
+            fromDate = String(dateStr);
+            toDate = String(dateStr);
+        }
+        
+        if (request->hasParam("maxLines")) {
+            maxLines = request->getParam("maxLines")->value().toInt();
+            if (maxLines > 5000) maxLines = 5000; // محدودیت برای جلوگیری از overload
+        }
+        
+        String historyData = getHistoryDataRange(fromDate, toDate, maxLines);
+        request->send(200, "application/json", historyData);
+    });
+    
+    // API برای دریافت آمار داده‌های تاریخی
+    server.on("/api/history/stats", HTTP_GET, [](AsyncWebServerRequest *request) {
+        String fromDate = "";
+        String toDate = "";
+        
+        // دریافت پارامترهای تاریخ
+        if (request->hasParam("fromDate") && request->hasParam("toDate")) {
+            fromDate = request->getParam("fromDate")->value();
+            toDate = request->getParam("toDate")->value();
+        } else if (request->hasParam("date")) {
+            // پشتیبانی از API قدیمی
+            String date = request->getParam("date")->value();
+            fromDate = date;
+            toDate = date;
+        } else {
+            // اگر تاریخ مشخص نشده، از تاریخ امروز استفاده کن
+            time_t now;
+            time(&now);
+            time_t localTime = now + (deviceConfig.time.gmtOffset * 60);
+            struct tm* timeinfo = gmtime(&localTime);
+            char dateStr[11];
+            strftime(dateStr, sizeof(dateStr), "%Y-%m-%d", timeinfo);
+            fromDate = String(dateStr);
+            toDate = String(dateStr);
+        }
+        
+        String stats = getHistoryStatsRange(fromDate, toDate);
+        request->send(200, "application/json", stats);
+    });
+    
+         // API برای دریافت لیست فایل‌های تاریخی موجود
+    server.on("/api/history/files", HTTP_GET, [](AsyncWebServerRequest *request) {
+        Serial.println("🔍 /api/history/files called");
+        
+        String result = "[";
+        bool firstFile = true;
+        int fileCount = 0;
+        
+        // باز کردن فولدر data
+        File dir = LittleFS.open("/data");
+        if (!dir || !dir.isDirectory()) {
+            Serial.println("❌ Cannot open /data directory");
+            request->send(200, "application/json", "[]");
+            return;
+        }
+        
+        Serial.println("✅ /data directory opened");
+        
+        // لیست کردن تمام فایل‌ها
+        File file = dir.openNextFile();
+        while (file) {
+            String fileName = String(file.name());
+            Serial.print("📁 Found: ");
+            Serial.println(fileName);
+            
+            // فقط فایل‌های CSV
+            if (!file.isDirectory() && fileName.endsWith(".csv")) {
+                // استخراج تاریخ از نام فایل
+                String date = fileName;
+                if (date.startsWith("/data/")) {
+                    date = date.substring(6); // حذف /data/
+                }
+                if (date.endsWith(".csv")) {
+                    date = date.substring(0, date.length() - 4); // حذف .csv
+                }
+                
+                // اضافه کردن به JSON
+                if (!firstFile) result += ",";
+                result += "{\"date\":\"" + date + "\",\"filename\":\"" + fileName + "\",\"size\":" + String(file.size()) + "}";
+                
+                Serial.print("📊 Added: ");
+                Serial.println(date);
+                
+                firstFile = false;
+                fileCount++;
+            }
+            file = dir.openNextFile();
+        }
+        
+        result += "]";
+        dir.close();
+        
+        Serial.print("📊 Total CSV files: ");
+        Serial.println(fileCount);
+        Serial.print("📋 JSON: ");
+        Serial.println(result);
+        
+        request->send(200, "application/json", result);
+    });
+
+    // API برای تنظیم روش بروزرسانی
+    server.on("/api/set-update-method", HTTP_POST, [](AsyncWebServerRequest *request) {
+        if (!request->hasParam("method", true)) {
+            request->send(400, "application/json", "{\"error\":\"Missing method parameter\"}");
+            return;
+        }
+        
+        int method = request->getParam("method", true)->value().toInt();
+        if (method != 0 && method != 1) {
+            request->send(400, "application/json", "{\"error\":\"Method must be 0 (AVERAGE) or 1 (DIRECT)\"}");
+            return;
+        }
+        
+        deviceConfig.advanced.updateMethod = method;
+        
         // ریست بافر نمونه‌ها برای اعمال تغییرات سریع‌تر
         resetSampleBuffer();
         
@@ -340,6 +508,120 @@ void setupWebServer() {
         doc["voltageOffset"] = deviceConfig.advanced.voltageOffset;
         doc["currentOffset"] = deviceConfig.advanced.currentOffset;
         doc["powerOffset"] = deviceConfig.advanced.powerOffset;
+        doc["historyLoggingEnabled"] = deviceConfig.advanced.historyLoggingEnabled;
+        doc["historyLoggingActive"] = deviceConfig.advanced.historyLoggingActive;
+        
+        String json;
+        serializeJson(doc, json);
+        request->send(200, "application/json", json);
+    });
+
+    // API برای فعال/غیرفعال کردن قابلیت لاگ کردن تاریخی
+    server.on("/api/toggle-history-logging", HTTP_POST, [](AsyncWebServerRequest *request) {
+        deviceConfig.advanced.historyLoggingEnabled = !deviceConfig.advanced.historyLoggingEnabled;
+        
+        // اگر قابلیت غیرفعال شد، لاگ کردن فعال را نیز متوقف کن
+        if (!deviceConfig.advanced.historyLoggingEnabled) {
+            deviceConfig.advanced.historyLoggingActive = false;
+        }
+        
+        saveConfig(deviceConfig);
+        
+        StaticJsonDocument<128> doc;
+        doc["enabled"] = deviceConfig.advanced.historyLoggingEnabled;
+        doc["active"] = deviceConfig.advanced.historyLoggingActive;
+        
+        String json;
+        serializeJson(doc, json);
+        request->send(200, "application/json", json);
+    });
+
+    // API برای شروع/توقف لاگ کردن فعال
+    server.on("/api/start-stop-logging", HTTP_POST, [](AsyncWebServerRequest *request) {
+        // فقط اگر قابلیت لاگ کردن فعال باشد، اجازه تغییر وضعیت بده
+        if (!deviceConfig.advanced.historyLoggingEnabled) {
+            request->send(400, "application/json", "{\"error\":\"History logging is disabled. Enable it first.\"}");
+            return;
+        }
+        
+        deviceConfig.advanced.historyLoggingActive = !deviceConfig.advanced.historyLoggingActive;
+        
+        // ذخیره تنظیمات
+        saveConfig(deviceConfig);
+        
+        // پیام مناسب برای لاگ
+        if (deviceConfig.advanced.historyLoggingActive) {
+            Serial.println("✅ Historical logging STARTED");
+        } else {
+            Serial.println("⏹️ Historical logging STOPPED");
+        }
+        
+        StaticJsonDocument<128> doc;
+        doc["active"] = deviceConfig.advanced.historyLoggingActive;
+        doc["message"] = deviceConfig.advanced.historyLoggingActive ? "Logging started" : "Logging stopped";
+        
+        String json;
+        serializeJson(doc, json);
+        request->send(200, "application/json", json);
+    });
+
+    // API برای دریافت وضعیت لاگ کردن
+    server.on("/api/logging-status", HTTP_GET, [](AsyncWebServerRequest *request) {
+        StaticJsonDocument<128> doc;
+        doc["historyLoggingEnabled"] = deviceConfig.advanced.historyLoggingEnabled;
+        doc["historyLoggingActive"] = deviceConfig.advanced.historyLoggingActive;
+        doc["status"] = deviceConfig.advanced.historyLoggingActive ? "ACTIVE" : 
+                       (deviceConfig.advanced.historyLoggingEnabled ? "READY" : "DISABLED");
+        
+        String json;
+        serializeJson(doc, json);
+        request->send(200, "application/json", json);
+    });
+
+    // API endpoint برای دریافت وضعیت time sync
+    server.on("/api/time-status", HTTP_GET, [](AsyncWebServerRequest *request) {
+        StaticJsonDocument<256> doc;
+        
+        if (isNTPActive()) {
+            doc["status"] = "NTP_ACTIVE";
+            doc["message"] = "Time synchronized with NTP";
+            doc["time"] = getFormattedTime();
+        } else if (ntpInitialized) {
+            doc["status"] = "NTP_FAILED";
+            doc["message"] = "NTP sync failed, using internal RTC";
+            doc["time"] = getFormattedTime();
+        } else {
+            doc["status"] = "SYNCING";
+            doc["message"] = "Time sync in progress...";
+            doc["time"] = "Syncing...";
+        }
+        
+        doc["timeSource"] = isNTPActive() ? "NTP" : "Internal RTC";
+        
+        String json;
+        serializeJson(doc, json);
+        request->send(200, "application/json", json);
+    });
+
+    // API endpoint برای دریافت زمان فعلی ESP32
+    server.on("/api/time", HTTP_GET, [](AsyncWebServerRequest *request) {
+        StaticJsonDocument<256> doc;
+        doc["timestamp"] = getCurrentTimestamp();
+        doc["formattedTime"] = getFormattedTime();
+        doc["timeSource"] = isNTPActive() ? "NTP" : "Internal RTC";
+        doc["timezone"] = "Tehran (UTC+3:30)";
+        
+        String json;
+        serializeJson(doc, json);
+        request->send(200, "application/json", json);
+    });
+
+    // API endpoint برای سینک دستی NTP
+    server.on("/api/sync-time", HTTP_POST, [](AsyncWebServerRequest *request) {
+        bool success = forceNTPSync();
+        StaticJsonDocument<128> doc;
+        doc["success"] = success;
+        doc["message"] = success ? "Time sync successful" : "Time sync failed";
         
         String json;
         serializeJson(doc, json);
