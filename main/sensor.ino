@@ -172,22 +172,22 @@ Sample calculateAverage() {
     return avg;
 }
 
-// تابع پردازش نمونه جدید
+// Process new sample function - with simple storage
 Sample processNewSample() {
     Sample newSample = readPZEM();
     
-    // لاگ کردن مقادیر خام سنسور قبل از هر پردازشی
+    // Log sensor values if enabled
     logSensorValues(newSample);
     
-    // لاگ کردن سمپل در فایل CSV
-    logSample(newSample);
+    // Use simple and optimized storage
+    logSampleOptimized(newSample);
     
-    // همیشه نمونه جدید را قبول کنیم، حتی اگر تغییرات ناگهانی باشد
-    // (به‌طور مثال وقتی مصرف‌کننده قطع می‌شود)
+    // Always accept new sample, even if there are sudden changes
+    // (e.g., when consumer is disconnected)
     samples[sampleIndex] = newSample;
     sampleIndex = (sampleIndex + 1) % WINDOW_SIZE;
     
-    // همیشه مقادیر مستقیم را برگردانیم بدون هیچ پردازش اضافی
+    // Always return direct values without any additional processing
     return newSample;
 }
 
@@ -198,6 +198,9 @@ void setupSensor() {
     
     // اطمینان از استفاده از روش مستقیم به‌روزرسانی
     deviceConfig.advanced.updateMethod = 0; // DIRECT
+    
+    // پاک کردن فایل‌های مشکل‌دار
+    cleanupCorruptedFiles();
 }
 
 // Returns the current averaged sensor values
@@ -248,7 +251,7 @@ void resetSampleBuffer() {
 
 // ===== LOGGING FUNCTIONS =====
 
-// تابع دریافت نام فایل روزانه (YYYY-MM-DD.csv)
+// تابع دریافت نام فایل روزانه (YYYY-MM-DD)
 String getCurrentDateString() {
     time_t now;
     time(&now);
@@ -259,7 +262,7 @@ String getCurrentDateString() {
     
     char dateStr[11];
     strftime(dateStr, sizeof(dateStr), "%Y-%m-%d", timeinfo);
-    return String(dateStr) + ".csv";
+    return String(dateStr); // حذف .csv از اینجا
 }
 
 // تابع ذخیره سمپل در فایل CSV
@@ -277,7 +280,7 @@ bool logSample(const Sample &sample) {
         }
     }
     
-    String fileName = "/data/" + getCurrentDateString();
+    String fileName = "/data/" + getCurrentDateString() + ".csv";
     File file = LittleFS.open(fileName, "a"); // append mode
     
     if (!file) {
@@ -558,4 +561,238 @@ String getHistoryStatsRange(const String &fromDate, const String &toDate) {
     
     // استفاده از تابع موجود getHistoryStats
     return getHistoryStats(date);
+} 
+
+// Simple and optimized storage function
+void logSampleOptimized(const Sample& sample) {
+    if (!deviceConfig.advanced.historyLoggingActive) {
+        return;
+    }
+    
+    static Sample lastStoredSample;
+    static bool isFirstSample = true;
+    
+    // Store first sample
+    if (isFirstSample) {
+        lastStoredSample = sample;
+        isFirstSample = false;
+        storeSampleToFile(sample);
+        Serial.printf("✅ First sample stored: v=%.2f, i=%.3f, p=%.2f\n", 
+                     sample.voltage, sample.current, sample.power);
+        return;
+    }
+    
+    // Check for significant changes
+    bool hasSignificantChange = false;
+    
+    float voltageDiff = abs(sample.voltage - lastStoredSample.voltage);
+    float currentDiff = abs(sample.current - lastStoredSample.current);
+    float powerDiff = abs(sample.power - lastStoredSample.power);
+    float pfDiff = abs(sample.pf - lastStoredSample.pf);
+    
+    // Check if significant change exists
+    if (voltageDiff > VOLTAGE_CHANGE_THRESHOLD ||
+        currentDiff > CURRENT_CHANGE_THRESHOLD ||
+        powerDiff > POWER_CHANGE_THRESHOLD ||
+        pfDiff > PF_CHANGE_THRESHOLD) {
+        
+        hasSignificantChange = true;
+        Serial.printf("🔄 Significant change detected: v_diff=%.3f, i_diff=%.3f, p_diff=%.3f, pf_diff=%.3f\n",
+                     voltageDiff, currentDiff, powerDiff, pfDiff);
+    }
+    
+    // Store if significant change detected
+    if (hasSignificantChange) {
+        lastStoredSample = sample;
+        storeSampleToFile(sample);
+        Serial.printf("✅ Sample stored: v=%.2f, i=%.3f, p=%.2f, pf=%.3f\n", 
+                     sample.voltage, sample.current, sample.power, sample.pf);
+    }
+}
+
+// Store sample to file function (optimized - only essential values)
+void storeSampleToFile(const Sample& sample) {
+    // Check if /data directory exists
+    if (!LittleFS.exists("/data")) {
+        if (!LittleFS.mkdir("/data")) {
+            Serial.println("❌ Failed to create /data directory");
+            return;
+        }
+    }
+    
+    String dateStr = getCurrentDateString();
+    if (dateStr.endsWith(".csv")) {
+        dateStr = dateStr.substring(0, dateStr.length() - 4);
+    }
+    String filename = "/data/" + dateStr + ".csv";
+    
+    File file = LittleFS.open(filename, "a");
+    if (!file) {
+        Serial.printf("❌ Failed to open file: %s\n", filename.c_str());
+        return;
+    }
+    
+    // Add header if file is empty (only essential values)
+    if (file.size() == 0) {
+        file.println("timestamp,voltage,current,power,energy,frequency,pf");
+    }
+    
+    // Optimized CSV format - only essential values (calculated values will be computed on display)
+    String line = String(sample.timestamp) + "," +
+                 String(sample.voltage, 2) + "," +
+                 String(sample.current, 3) + "," +
+                 String(sample.power, 2) + "," +
+                 String(sample.energy, 3) + "," +
+                 String(sample.frequency, 1) + "," +
+                 String(sample.pf, 3);
+    
+    file.println(line);
+    file.close();
+}
+
+// Read optimized data from file function
+std::vector<Sample> readOptimizedData(const String& date) {
+    std::vector<Sample> samples;
+    String filename = "/data/" + date + ".csv";
+    
+    if (!LittleFS.exists(filename)) {
+        Serial.printf("❌ File not found: %s\n", filename.c_str());
+        return samples;
+    }
+    
+    File file = LittleFS.open(filename, "r");
+    if (!file) {
+        Serial.printf("❌ Cannot open file: %s\n", filename.c_str());
+        return samples;
+    }
+    
+    bool isFirstLine = true;
+    while (file.available()) {
+        String line = file.readStringUntil('\n');
+        line.trim();
+        
+        if (line.length() > 0) {
+            // Skip header
+            if (isFirstLine && line.startsWith("timestamp")) {
+                isFirstLine = false;
+                continue;
+            }
+            isFirstLine = false;
+            
+            // Parse CSV line: timestamp,voltage,current,power,energy,frequency,pf,apparentPower,reactivePower
+            int comma1 = line.indexOf(',');
+            int comma2 = line.indexOf(',', comma1 + 1);
+            int comma3 = line.indexOf(',', comma2 + 1);
+            int comma4 = line.indexOf(',', comma3 + 1);
+            int comma5 = line.indexOf(',', comma4 + 1);
+            int comma6 = line.indexOf(',', comma5 + 1);
+            int comma7 = line.indexOf(',', comma6 + 1);
+            int comma8 = line.indexOf(',', comma7 + 1);
+            
+            if (comma8 != -1) {
+                Sample sample;
+                sample.timestamp = line.substring(0, comma1).toInt();
+                sample.voltage = line.substring(comma1 + 1, comma2).toFloat();
+                sample.current = line.substring(comma2 + 1, comma3).toFloat();
+                sample.power = line.substring(comma3 + 1, comma4).toFloat();
+                sample.energy = line.substring(comma4 + 1, comma5).toFloat();
+                sample.frequency = line.substring(comma5 + 1, comma6).toFloat();
+                sample.pf = line.substring(comma6 + 1, comma7).toFloat();
+                sample.apparentPower = line.substring(comma7 + 1, comma8).toFloat();
+                sample.reactivePower = line.substring(comma8 + 1).toFloat();
+                
+                samples.push_back(sample);
+            }
+        }
+    }
+    
+    file.close();
+    Serial.printf("📊 Read %d samples from %s\n", samples.size(), filename.c_str());
+    return samples;
+}
+
+// تابع محاسبه آمار از داده‌های بهینه شده
+String getOptimizedStats(const String& date) {
+    std::vector<Sample> samples = readOptimizedData(date);
+    
+    if (samples.empty()) {
+        return "{\"error\":\"No data found\"}";
+    }
+    
+    // محاسبه آمار
+    float minVoltage = samples[0].voltage, maxVoltage = samples[0].voltage, avgVoltage = 0;
+    float minCurrent = samples[0].current, maxCurrent = samples[0].current, avgCurrent = 0;
+    float minPower = samples[0].power, maxPower = samples[0].power, avgPower = 0;
+    float minPf = samples[0].pf, maxPf = samples[0].pf, avgPf = 0;
+    float totalEnergy = 0;
+    
+    for (const auto& sample : samples) {
+        // ولتاژ
+        if (sample.voltage < minVoltage) minVoltage = sample.voltage;
+        if (sample.voltage > maxVoltage) maxVoltage = sample.voltage;
+        avgVoltage += sample.voltage;
+        
+        // جریان
+        if (sample.current < minCurrent) minCurrent = sample.current;
+        if (sample.current > maxCurrent) maxCurrent = sample.current;
+        avgCurrent += sample.current;
+        
+        // توان
+        if (sample.power < minPower) minPower = sample.power;
+        if (sample.power > maxPower) maxPower = sample.power;
+        avgPower += sample.power;
+        
+        // ضریب توان
+        if (sample.pf < minPf) minPf = sample.pf;
+        if (sample.pf > maxPf) maxPf = sample.pf;
+        avgPf += sample.pf;
+        
+        // انرژی (محاسبه تقریبی)
+        totalEnergy += sample.power * (1.0 / 3600.0); // تبدیل به kWh
+    }
+    
+    int count = samples.size();
+    avgVoltage /= count;
+    avgCurrent /= count;
+    avgPower /= count;
+    avgPf /= count;
+    
+    // ساخت JSON
+    String json = "{";
+    json += "\"voltage\":{\"min\":" + String(minVoltage, 2) + ",\"max\":" + String(maxVoltage, 2) + ",\"avg\":" + String(avgVoltage, 2) + "},";
+    json += "\"current\":{\"min\":" + String(minCurrent, 3) + ",\"max\":" + String(maxCurrent, 3) + ",\"avg\":" + String(avgCurrent, 3) + "},";
+    json += "\"power\":{\"min\":" + String(minPower, 2) + ",\"max\":" + String(maxPower, 2) + ",\"avg\":" + String(avgPower, 2) + "},";
+    json += "\"pf\":{\"min\":" + String(minPf, 3) + ",\"max\":" + String(maxPf, 3) + ",\"avg\":" + String(avgPf, 3) + "},";
+    json += "\"totalEnergy\":" + String(totalEnergy, 3) + ",";
+    json += "\"sampleCount\":" + String(count) + "";
+    json += "}";
+    
+    return json;
+} 
+
+// تابع پاک کردن فایل‌های مشکل‌دار
+void cleanupCorruptedFiles() {
+    if (!LittleFS.exists("/data")) {
+        return;
+    }
+    
+    File dir = LittleFS.open("/data");
+    if (!dir || !dir.isDirectory()) {
+        return;
+    }
+    
+    File file = dir.openNextFile();
+    while (file) {
+        String fileName = String(file.name());
+        
+        // بررسی فایل‌های مشکل‌دار (با پسوند .csv.csv)
+        if (fileName.endsWith(".csv.csv")) {
+            Serial.printf("🗑️ Removing corrupted file: %s\n", fileName.c_str());
+            LittleFS.remove(fileName);
+        }
+        
+        file = dir.openNextFile();
+    }
+    
+    dir.close();
 } 

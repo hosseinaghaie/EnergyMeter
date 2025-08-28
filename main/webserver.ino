@@ -289,69 +289,63 @@ void setupWebServer() {
 
     // ===== HISTORY API ENDPOINTS =====
     
-    // API برای دریافت داده‌های تاریخی
+    // API برای دریافت داده‌های تاریخی بهینه شده
     server.on("/api/history", HTTP_GET, [](AsyncWebServerRequest *request) {
-        String fromDate = "";
-        String toDate = "";
-        int maxLines = 1000;
+        String date = request->getParam("date")->value();
+        String maxLinesStr = request->getParam("maxLines")->value();
+        int maxLines = maxLinesStr.length() > 0 ? maxLinesStr.toInt() : 1000;
         
-        // دریافت پارامترهای تاریخ
-        if (request->hasParam("fromDate") && request->hasParam("toDate")) {
-            fromDate = request->getParam("fromDate")->value();
-            toDate = request->getParam("toDate")->value();
-        } else if (request->hasParam("date")) {
-            // پشتیبانی از API قدیمی
-            String date = request->getParam("date")->value();
-            fromDate = date;
-            toDate = date;
-        } else {
-            // اگر تاریخ مشخص نشده، از تاریخ امروز استفاده کن
-            time_t now;
-            time(&now);
-            time_t localTime = now + (deviceConfig.time.gmtOffset * 60);
-            struct tm* timeinfo = gmtime(&localTime);
-            char dateStr[11];
-            strftime(dateStr, sizeof(dateStr), "%Y-%m-%d", timeinfo);
-            fromDate = String(dateStr);
-            toDate = String(dateStr);
+        Serial.print("🔍 /api/history called for date: ");
+        Serial.println(date);
+        
+        std::vector<Sample> samples = readOptimizedData(date);
+        
+        if (samples.empty()) {
+            request->send(200, "application/json", "[]");
+            return;
         }
         
-        if (request->hasParam("maxLines")) {
-            maxLines = request->getParam("maxLines")->value().toInt();
-            if (maxLines > 5000) maxLines = 5000; // محدودیت برای جلوگیری از overload
+        // محدود کردن تعداد نمونه‌ها
+        if (samples.size() > maxLines) {
+            samples.erase(samples.begin(), samples.end() - maxLines);
         }
         
-        String historyData = getHistoryDataRange(fromDate, toDate, maxLines);
-        request->send(200, "application/json", historyData);
+        String json = "[";
+        bool first = true;
+        
+        for (const auto& sample : samples) {
+            if (!first) json += ",";
+            json += "{";
+            json += "\"timestamp\":" + String(sample.timestamp) + ",";
+            json += "\"voltage\":" + String(sample.voltage, 2) + ",";
+            json += "\"current\":" + String(sample.current, 3) + ",";
+            json += "\"power\":" + String(sample.power, 2) + ",";
+            json += "\"energy\":" + String(sample.energy, 3) + ",";
+            json += "\"frequency\":" + String(sample.frequency, 1) + ",";
+            json += "\"pf\":" + String(sample.pf, 3) + ",";
+            json += "\"apparentPower\":" + String(sample.apparentPower, 2) + ",";
+            json += "\"reactivePower\":" + String(sample.reactivePower, 2);
+            json += "}";
+            first = false;
+        }
+        
+        json += "]";
+        
+        Serial.print("📊 Sending ");
+        Serial.print(samples.size());
+        Serial.println(" samples");
+        
+        request->send(200, "application/json", json);
     });
     
-    // API برای دریافت آمار داده‌های تاریخی
+    // API برای دریافت آمار بهینه شده
     server.on("/api/history/stats", HTTP_GET, [](AsyncWebServerRequest *request) {
-        String fromDate = "";
-        String toDate = "";
+        String date = request->getParam("date")->value();
         
-        // دریافت پارامترهای تاریخ
-        if (request->hasParam("fromDate") && request->hasParam("toDate")) {
-            fromDate = request->getParam("fromDate")->value();
-            toDate = request->getParam("toDate")->value();
-        } else if (request->hasParam("date")) {
-            // پشتیبانی از API قدیمی
-            String date = request->getParam("date")->value();
-            fromDate = date;
-            toDate = date;
-        } else {
-            // اگر تاریخ مشخص نشده، از تاریخ امروز استفاده کن
-            time_t now;
-            time(&now);
-            time_t localTime = now + (deviceConfig.time.gmtOffset * 60);
-            struct tm* timeinfo = gmtime(&localTime);
-            char dateStr[11];
-            strftime(dateStr, sizeof(dateStr), "%Y-%m-%d", timeinfo);
-            fromDate = String(dateStr);
-            toDate = String(dateStr);
-        }
+        Serial.print("🔍 /api/history/stats called for date: ");
+        Serial.println(date);
         
-        String stats = getHistoryStatsRange(fromDate, toDate);
+        String stats = getOptimizedStats(date);
         request->send(200, "application/json", stats);
     });
     
